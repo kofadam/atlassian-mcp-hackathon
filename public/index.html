@@ -273,6 +273,78 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        @media (max-width: 768px) {
+            body {
+                padding: 0;
+                height: 100vh;
+            }
+            
+            .container {
+                border-radius: 0;
+                height: 100vh;
+                max-width: 100%;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .header p {
+                font-size: 0.9em;
+            }
+            
+            .suggestions {
+                padding: 10px;
+                max-height: 80px;
+                overflow-x: auto;
+                overflow-y: hidden;
+            }
+            
+            .suggestion-chips {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: 5px;
+            }
+            
+            .chip {
+                flex-shrink: 0;
+                font-size: 0.8em;
+                padding: 6px 12px;
+            }
+            
+            .chat-area {
+                padding: 15px;
+                flex: 1;
+                min-height: 0;
+            }
+            
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-area {
+                padding: 10px;
+            }
+            
+            #queryInput {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            .assistant-bubble, .user-bubble {
+                max-width: 90%;
+            }
+        }
+
+        /* Hide suggestions on very small screens if needed */
+        @media (max-width: 400px) {
+            .suggestions {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -311,7 +383,7 @@
             <button id="sendBtn" onclick="sendQuery()">Send</button>
         </div>
     </div>
-
+    <script src="config.js"></script>
     <script>
         const chatArea = document.getElementById('chatArea');
         const queryInput = document.getElementById('queryInput');
@@ -335,9 +407,11 @@
             sendBtn.innerHTML = '<div class="loading"></div>';
             
             try {
-                const response = await fetch('/api/query', {
+                const response = await fetch(`${window.API_URL}/api/query`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({ query })
                 });
                 
@@ -363,7 +437,7 @@
             bubble.innerHTML = text;
             
             if (data) {
-                if (data.type === 'issues' || data.type === 'bugs') {
+                if (data.type === 'issues' || data.type === 'bugs' || data.type === 'stories' || data.type === 'tasks') {
                     const grid = document.createElement('div');
                     grid.className = 'results-grid';
                     
