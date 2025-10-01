@@ -52,6 +52,22 @@ export function processNaturalLanguage(query) {
       he: /(?:הצג|הראה)(?: לי)?(?: את)?(?: כל)? (?:המשימות|משימות)/
     },
     
+    // Add to patterns object
+    inProgress: {
+      en: /(?:show|get|list)(?: me)?(?: only)?(?: the)? in[\s-]?progress (?:tasks?|issues?|items?|work)/i,
+      he: /(?:הצג|הראה)(?: לי)?(?: רק)? (?:משימות|נושאים) בעבודה/
+    },
+
+    todo: {
+      en: /(?:show|get|list)(?: me)?(?: only)?(?: the)? (?:to[\s-]?do|todo|pending|open) (?:tasks?|issues?|items?)/i,
+      he: /(?:הצג|הראה)(?: לי)? (?:משימות|נושאים) (?:לביצוע|פתוחים)/
+    },
+
+    done: {
+      en: /(?:show|get|list)(?: me)?(?: only)?(?: the)? (?:done|completed|finished|closed) (?:tasks?|issues?|items?)/i,
+      he: /(?:הצג|הראה)(?: לי)? (?:משימות|נושאים) (?:שהושלמו|סגורים)/
+    },
+
     // Open issues
     openIssues: {
       en: /(?:open|active|unresolved|pending|in progress) (?:issues?|items?|tickets?)/i,
@@ -263,6 +279,32 @@ export function processNaturalLanguage(query) {
     };
   }
 
+  // Check for in-progress items
+  if (patterns.inProgress.en.test(lowerQuery)) {
+    return {
+      intent: 'search',
+      jql: 'project = KMD AND status = "In Progress"',
+      description: 'In-progress tasks and issues'
+    };
+  }
+
+  // Check for to-do items
+  if (patterns.todo.en.test(lowerQuery)) {
+    return {
+      intent: 'search',
+      jql: 'project = KMD AND status = "To Do"',
+      description: 'To-do tasks and issues'
+    };
+  }
+
+  // Check for completed items
+  if (patterns.done.en.test(lowerQuery)) {
+    return {
+      intent: 'search',
+      jql: 'project = KMD AND status = "Done"',
+      description: 'Completed tasks and issues'
+    };
+  }
   // Blocked issues
   if (patterns.blocked.en.test(lowerQuery)) {
     return { 
@@ -280,7 +322,7 @@ export function processNaturalLanguage(query) {
       description: 'Epic-level initiatives'
     };
   }
-  
+
   // For specific sprint numbers
   const sprintNumberMatch = lowerQuery.match(/sprint\s*(\d+)/i);
   if (sprintNumberMatch) {

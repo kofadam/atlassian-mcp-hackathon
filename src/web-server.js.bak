@@ -75,33 +75,20 @@ async function processQuery(query) {
   console.log(`\n📝 Processing query: "${query}"`);
   
   try {
-    // FIRST: Check for report generation intent
+    // Use the improved NLP processor to understand the query
+    const nlpResult = processNaturalLanguage(query);
+    console.log(`   Intent: ${nlpResult.intent}`);
+    console.log(`   Description: ${nlpResult.description}`);
+    
+    // Check for report generation intent
     const reportIntent = detectReportIntent(query);
     if (reportIntent) {
-      console.log(`   Report Intent Detected: ${reportIntent.reportType}`);
-      
-      let jql = `project = ${projectKey}`;
-      
-      // Handle different report types with specific JQL
+      let jql = 'project = KMD';
       if (reportIntent.reportType === 'sprint') {
-        // Check if query mentions a specific sprint number
-        const sprintMatch = query.match(/sprint\s+(\d+)/i);
-        if (sprintMatch) {
-          jql += ` AND sprint = "Sprint ${sprintMatch[1]}"`;
-          console.log(`   Generating report for Sprint ${sprintMatch[1]}`);
-        } else {
-          jql += ' AND sprint in openSprints()';
-          console.log('   Generating report for current sprint');
-        }
+        jql += ' AND sprint in openSprints()';
       } else if (reportIntent.reportType === 'bug') {
         jql += ' AND type = Bug';
-        console.log('   Generating bug report');
-      } else if (reportIntent.reportType === 'status') {
-        // Status report gets all issues
-        console.log('   Generating status report');
       }
-      
-      console.log(`   JQL: ${jql}`);
       
       const searchResult = await mcpClient.callTool({
         name: 'searchJiraIssuesUsingJql',
@@ -113,85 +100,14 @@ async function processQuery(query) {
       });
       
       const issues = JSON.parse(searchResult.content[0].text).issues || [];
-      console.log(`   Found ${issues.length} issues for report`);
-      
       const report = generateReport(issues, reportIntent.reportType);
       
-      // Check if we should publish to Confluence
-      if (reportIntent.shouldPublish) {
-        console.log('   Publishing report to Confluence...');
-        
-        try {
-          // First, search for any Confluence content to get a valid space ID
-          const searchResult = await mcpClient.callTool({
-            name: 'searchConfluenceUsingCql',
-            arguments: {
-              cloudId: cloudId,
-              cql: '',
-              limit: 1
-            }
-          });
-          
-          const searchData = JSON.parse(searchResult.content[0].text);
-          
-          if (!searchData.results || searchData.results.length === 0) {
-            throw new Error('No Confluence content found to determine space');
-          }
-          
-          // Get the space ID from the first result
-          const spaceId = searchData.results[0].space.id;
-          const spaceKey = searchData.results[0].space.key;
-          
-          console.log(`   Using space: ${spaceKey} (ID: ${spaceId})`);
-          
-          // Create the Confluence page with the numeric space ID
-          const createResult = await mcpClient.callTool({
-            name: 'createConfluencePage',
-            arguments: {
-              cloudId: cloudId,
-              spaceId: spaceId.toString(),  // Use the numeric space ID
-              title: report.title,
-              body: report.content,
-              bodyFormat: 'storage'
-            }
-          });
-          
-          const createdPage = JSON.parse(createResult.content[0].text);
-          console.log('   Created page response:', JSON.stringify(createdPage, null, 2));
-          
-          if (createdPage.error) {
-            throw new Error(createdPage.message);
-          }
-          
-          const pageId = createdPage.id || createdPage.pageId || createdPage._id;
-          const pageUrl = `https://kofadam.atlassian.net/wiki/spaces/${spaceKey}/pages/${pageId}`;
-          
-          console.log(`   ✅ Report published to Confluence: ${pageUrl}`);
-          
-          return {
-            type: 'report',
-            message: `Generated and published ${reportIntent.reportType} report to Confluence! View at: ${pageUrl}`,
-            report: report,
-            confluenceUrl: pageUrl
-          };
-        } catch (error) {
-          console.error('   ⚠️ Could not publish to Confluence:', error.message);
-          // Still return the report even if publishing failed
-        }
-      }
-
       return {
         type: 'report',
         message: `Generated ${reportIntent.reportType} report`,
         report: report
       };
     }
-    
-    // SECOND: Use the improved NLP processor if not a report
-    const nlpResult = processNaturalLanguage(query);
-    console.log(`   Intent: ${nlpResult.intent}`);
-    console.log(`   Description: ${nlpResult.description}`);
-    
     // Handle creation intent
     if (nlpResult.intent === 'create') {
       try {
@@ -310,8 +226,7 @@ async function processQuery(query) {
     }
     
     // Handle search intent (default)
-    // Changed from 'let jql' to just 'jql' since it's already declared above
-    let jql = nlpResult.jql || `project = ${projectKey}`;
+    let jql = nlpResult.jql;
     
     // Ensure project key is in the JQL if not already present
     if (!jql.includes('project =')) {
@@ -427,8 +342,7 @@ const server = http.createServer(async (req, res) => {
     const js = fs.readFileSync(path.join(__dirname, '../public/config.js'), 'utf8');
     res.end(js);
     return;
-  }
-  
+  }  
   // Test endpoint
   if (req.url === '/api/test' && req.method === 'GET') {
     try {
