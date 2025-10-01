@@ -604,19 +604,46 @@
                 if (data.type === 'confluence') {
                     const grid = document.createElement('div');
                     grid.className = 'results-grid';
-                    
+
                     data.data.forEach(page => {
                         const card = document.createElement('div');
                         card.className = 'issue-card';
                         card.style.borderLeftColor = '#2684ff';
+
+                        // Strip HTML tags from excerpt
+                        let cleanExcerpt = '';
+                        if (page.excerpt) {
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = page.excerpt;
+                            cleanExcerpt = tempDiv.textContent || tempDiv.innerText || '';
+                        }
+
+                        // Get Confluence URL - try multiple possible locations
+                        let baseUrl = null;
+                        if (page.url) {
+                            baseUrl = `https://kofadam.atlassian.net/wiki${page.url}`;
+                        } else if (page._links?.webui) {
+                            baseUrl = `https://kofadam.atlassian.net/wiki${page._links.webui}`;
+                        } else if (page.resultGlobalContainer?.displayUrl) {
+                            baseUrl = page.resultGlobalContainer.displayUrl;
+                        }
+
                         card.innerHTML = `
-                            <div class="issue-key">📄 ${page.space?.name || 'Confluence'}</div>
+                            <div class="issue-key">📄 ${page.resultGlobalContainer?.title || page.space?.name || 'Confluence'}</div>
                             <div class="issue-summary">${page.title}</div>
-                            ${page.excerpt ? `<div class="issue-meta">${page.excerpt.substring(0, 100)}...</div>` : ''}
+                            ${cleanExcerpt ? `<div class="issue-meta">${cleanExcerpt.substring(0, 150)}...</div>` : ''}
                         `;
+
+                        // Make card clickable
+                        if (baseUrl) {
+                            card.onclick = () => window.open(baseUrl, '_blank');
+                            card.style.cursor = 'pointer';
+                            card.title = 'לחץ כדי לפתוח ב-Confluence';
+                        }
+
                         grid.appendChild(card);
                     });
-                    
+
                     bubble.appendChild(grid);
                 }
             }

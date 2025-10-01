@@ -237,6 +237,30 @@ export function processNaturalLanguage(query) {
     };
   }
 
+  // *** CHECK FOR CONFLUENCE FIRST - before any Jira patterns ***
+  // This ensures "initiatives from confluence" goes to Confluence, not Jira epics
+  if (lowerQuery.includes('confluence') || lowerQuery.includes('קונפלואנס') ||
+      (lowerQuery.includes('from confluence')) || (query.includes('מ-confluence'))) {
+    // Check if there's a specific term to search for
+    const searchTermMatch = lowerQuery.match(/(?:show|get|find|search|חפש|הצג|מצא)(?:\s+(?:me|all|את))?\s+(?:all\s+)?(.+?)\s+(?:from|in|on|ב|מ-|מתוך)?\s*confluence/i);
+    if (searchTermMatch) {
+      const searchTerm = searchTermMatch[1].trim().replace(/information|content|data|pages?/gi, '').trim();
+      if (searchTerm && searchTerm.length > 2) {
+        return {
+          intent: 'confluence',
+          cql: `type=page AND text ~ "${searchTerm}"`,
+          description: `Confluence pages about "${searchTerm}"`
+        };
+      }
+    }
+    // General Confluence search
+    return {
+      intent: 'confluence',
+      cql: 'type=page',
+      description: 'Confluence documentation'
+    };
+  }
+
   // Check Hebrew patterns first if Hebrew detected
   if (isHebrew) {
     // Check for fixed/completed bugs first (more specific)
@@ -257,15 +281,15 @@ export function processNaturalLanguage(query) {
     }
 
     if (patterns.hebrewTasks.he.test(query)) {
-      return { 
-        intent: 'search', 
+      return {
+        intent: 'search',
         jql: 'project = KMD AND (summary ~ "תרגום" OR summary ~ "עברית" OR summary ~ "מדריך" OR summary ~ "נגישות")',
         description: 'מציג משימות בעברית'
       };
     }
-    
+
     if (patterns.projectSummary.he.test(query)) {
-      return { 
+      return {
         intent: 'summary',
         jql: 'project = KMD ORDER BY created DESC',
         description: 'סיכום הפרויקט'
@@ -577,28 +601,7 @@ export function processNaturalLanguage(query) {
     };
   }
  
-  // Check for Confluence with specific search terms
-  if (lowerQuery.includes('documentation') || lowerQuery.includes('confluence') || lowerQuery.includes('docs') || lowerQuery.includes('pages')) {
-    // Check if there's a specific term to search for
-    const mentioningMatch = lowerQuery.match(/(?:mentioning|about|containing|with|regarding)\s+(.+)/i);
-    if (mentioningMatch) {
-      const searchTerm = mentioningMatch[1].trim();
-      return {
-        intent: 'confluence',
-        cql: `type=page AND text ~ "${searchTerm}"`,
-        description: `Confluence pages mentioning "${searchTerm}"`
-      };
-    }
-  }
-  
-  // Confluence pages
-  if (patterns.confluencePages.en.test(lowerQuery)) {
-    return { 
-      intent: 'confluence', 
-      cql: 'type=page',
-      description: 'Confluence documentation'
-    };
-  }
+  // Confluence check moved to top of function for priority
 
   // Project summary (default for general questions)
   if (patterns.projectSummary.en.test(lowerQuery)) {
