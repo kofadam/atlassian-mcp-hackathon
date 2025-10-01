@@ -1,6 +1,9 @@
 # 🚀 Atlassian MCP Hackathon POC
 
 Natural language AI assistant for Jira & Confluence using Atlassian's Model Context Protocol (MCP) Server.
+<img width="2714" height="1546" alt="ui-help" src="https://github.com/user-attachments/assets/08e6d799-a738-4243-9d57-1d7e436461c9" />
+<img width="2776" height="1653" alt="ui-project-summary" src="https://github.com/user-attachments/assets/759fa5ec-b5ee-4160-b040-43384b5acb87" />
+<img width="2708" height="1764" alt="ui-bug-report" src="https://github.com/user-attachments/assets/275b4b2b-c893-4a4a-9aa8-0eb9dfcbdf93" />
 
 ## 🎯 What This Does
 
