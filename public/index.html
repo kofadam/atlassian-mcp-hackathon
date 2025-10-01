@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlassian AI Assistant</title>
+    <title>עוזר AI של Atlassian</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23667eea'/><text x='50%25' y='50%25' font-size='14' font-weight='bold' fill='white' text-anchor='middle' dy='.35em'>AA</text></svg>">
     <style>
         /* Report table styles */
@@ -349,39 +349,34 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 Atlassian AI Assistant</h1>
-            <p>Ask me anything about your Jira or Confluence workspace</p>
+            <h1>🤖 עוזר AI של Atlassian</h1>
+            <p>שאל אותי כל דבר על Jira או Confluence שלך</p>
         </div>
-        
+
         <div class="suggestions">
-            <div class="suggestions-title">💡 Try asking:</div>
-            <div class="suggestion-chips">
-                <div class="chip" onclick="askQuestion('Show me all bugs')">🐛 Show me all bugs</div>
-                <div class="chip" onclick="askQuestion('What are the high priority issues?')">🚨 High priority issues</div>
-                <div class="chip" onclick="askQuestion('Give me a project summary')">📊 Project summary</div>
-                <div class="chip" onclick="askQuestion('Generate a sprint report')">📋 Sprint Report</div>
-                <div class="chip" onclick="askQuestion('Create a bug report')">📝 Bug Report</div>
-                <div class="chip" onclick="askQuestion('Show confluence pages')">📚 Confluence pages</div>
-                <div class="chip" onclick="askQuestion('Find issues about API')">🔍 Search issues</div>
+            <div class="suggestions-title">💡 נסה לשאול:</div>
+            <div class="suggestion-chips" id="suggestionChips">
+                <!-- Dynamic suggestions will be inserted here -->
             </div>
         </div>
         
         <div class="chat-area" id="chatArea">
             <div class="message assistant-message">
                 <div class="assistant-bubble">
-                    👋 Hello! I'm your AI assistant for Atlassian. I can help you search Jira issues, view bugs, check priorities, browse Confluence pages, and generate reports. What would you like to know?
+                    👋 שלום! אני העוזר שלך ל-Atlassian. אני יכול לעזור לך לחפש נושאים ב-Jira, לראות באגים, לבדוק עדיפויות, לעיין בדפי Confluence ולייצר דוחות. במה תרצה שאעזור?
                 </div>
             </div>
         </div>
-        
+
         <div class="input-area">
-            <input 
-                type="text" 
-                id="queryInput" 
-                placeholder="Ask me anything about your Jira or Confluence..."
+            <input
+                type="text"
+                id="queryInput"
+                placeholder="שאל אותי כל דבר על Jira או Confluence שלך..."
                 onkeypress="if(event.key==='Enter') sendQuery()"
+                dir="auto"
             />
-            <button id="sendBtn" onclick="sendQuery()">Send</button>
+            <button id="sendBtn" onclick="sendQuery()">שלח</button>
         </div>
     </div>
     <script src="config.js"></script>
@@ -389,6 +384,74 @@
         const chatArea = document.getElementById('chatArea');
         const queryInput = document.getElementById('queryInput');
         const sendBtn = document.getElementById('sendBtn');
+
+        // Sophisticated suggestion system with contextual hints
+        const suggestionSets = {
+            initial: [
+                { icon: '❓', text: 'עזרה', query: 'עזרה' },
+                { icon: '🐛', text: 'הצג את כל הבאגים', query: 'הצג את כל הבאגים' },
+                { icon: '🚨', text: 'נושאים בעדיפות גבוהה', query: 'הצג נושאים בעדיפות גבוהה' },
+                { icon: '📊', text: 'סיכום פרויקט', query: 'תן לי סיכום פרויקט' },
+                { icon: '📋', text: 'דוח ספרינט', query: 'צור דוח ספרינט' },
+                { icon: '👤', text: 'משימות שלי', query: 'הצג משימות משויכות לי' },
+                { icon: '🔮', text: 'ספרינטים עתידיים', query: 'הצג משימות בספרינטים עתידיים' }
+            ],
+            help: [
+                { icon: '🔍', text: 'חיפוש נושאים', query: 'חפש נושאים בסטטוס In Progress' },
+                { icon: '📅', text: 'שאילתות ספרינט', query: 'הצג נושאים בספרינט 2' },
+                { icon: '👥', text: 'משימות לפי משתמש', query: 'הצג משימות משויכות ל-Kof Adam' },
+                { icon: '📊', text: 'דוחות', query: 'צור דוח באגים' },
+                { icon: '🔮', text: 'ספרינטים עתידיים', query: 'הצג משימות בביצוע בספרינטים עתידיים' },
+                { icon: '📚', text: 'Confluence', query: 'הצג דפי Confluence' },
+                { icon: '🎯', text: 'עוד דוגמאות', query: 'הצג דוגמאות נוספות' }
+            ],
+            afterBugs: [
+                { icon: '🔥', text: 'רק קריטיים', query: 'רק קריטיים' },
+                { icon: '📅', text: 'באגים מהשבוע', query: 'הצג באגים מהשבוע האחרון' },
+                { icon: '📝', text: 'צור דוח באגים', query: 'צור דוח באגים' },
+                { icon: '✅', text: 'באגים שתוקנו', query: 'הצג באגים שתוקנו' }
+            ],
+            afterSprint: [
+                { icon: '📊', text: 'דוח סטטוס', query: 'צור דוח סטטוס' },
+                { icon: '🎯', text: 'ספרינט הבא', query: 'הצג ספרינט הבא' },
+                { icon: '📈', text: 'ניתוח התקדמות', query: 'תן לי ניתוח התקדמות' }
+            ],
+            afterSummary: [
+                { icon: '🐛', text: 'הצג באגים', query: 'הצג את כל הבאגים' },
+                { icon: '📋', text: 'דוח ספרינט', query: 'צור דוח ספרינט' },
+                { icon: '🔍', text: 'חפש נושאים', query: 'חפש נושאים' }
+            ]
+        };
+
+        let currentContext = 'initial';
+        let lastQuery = null;
+
+        function updateSuggestions(context = 'initial') {
+            currentContext = context;
+            let suggestions = suggestionSets[context] || suggestionSets.initial;
+            const container = document.getElementById('suggestionChips');
+            container.innerHTML = '';
+
+            // Always add help button first (unless we're already in help context)
+            if (context !== 'help' && context !== 'initial') {
+                const helpChip = document.createElement('div');
+                helpChip.className = 'chip';
+                helpChip.innerHTML = '❓ עזרה';
+                helpChip.onclick = () => askQuestion('עזרה');
+                container.appendChild(helpChip);
+            }
+
+            suggestions.forEach(sugg => {
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                chip.innerHTML = `${sugg.icon} ${sugg.text}`;
+                chip.onclick = () => askQuestion(sugg.query);
+                container.appendChild(chip);
+            });
+        }
+
+        // Initialize with default suggestions
+        updateSuggestions('initial');
         
         // Global addMessage function - moved to global scope to fix TypeError
         function addMessage(sender, text, data = null) {
@@ -401,6 +464,56 @@
             
             // Handle report type data
             if (data && data.type === 'report') {
+                // Add export options with buttons
+                if (data.exportOptions) {
+                    const exportDiv = document.createElement('div');
+                    exportDiv.style.cssText = 'background: #f0f7ff; padding: 15px; margin-top: 10px; border-radius: 8px; border-right: 4px solid #0052cc; direction: rtl; text-align: right;';
+
+                    const title = document.createElement('div');
+                    title.style.cssText = 'font-weight: 600; margin-bottom: 10px; color: #0052cc;';
+                    title.textContent = '📋 אפשרויות ייצוא:';
+                    exportDiv.appendChild(title);
+
+                    const buttonsDiv = document.createElement('div');
+                    buttonsDiv.style.cssText = 'display: flex; gap: 10px; flex-wrap: wrap;';
+
+                    // Copy HTML button
+                    const copyBtn = document.createElement('button');
+                    copyBtn.textContent = '📋 העתק HTML';
+                    copyBtn.style.cssText = 'background: #0052cc; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9em;';
+                    copyBtn.onclick = () => {
+                        navigator.clipboard.writeText(data.exportOptions.html).then(() => {
+                            copyBtn.textContent = '✅ הועתק!';
+                            setTimeout(() => copyBtn.textContent = '📋 העתק HTML', 2000);
+                        });
+                    };
+                    buttonsDiv.appendChild(copyBtn);
+
+                    // Download HTML button
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.textContent = '💾 הורד HTML';
+                    downloadBtn.style.cssText = 'background: #00875a; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9em;';
+                    downloadBtn.onclick = () => {
+                        const blob = new Blob([data.exportOptions.html], { type: 'text/html' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `report-${new Date().toISOString().split('T')[0]}.html`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    };
+                    buttonsDiv.appendChild(downloadBtn);
+
+                    exportDiv.appendChild(buttonsDiv);
+
+                    const hint = document.createElement('div');
+                    hint.style.cssText = 'margin-top: 10px; font-size: 0.85em; color: #5e6c84;';
+                    hint.textContent = 'לפרסום ב-Confluence: העתק את ה-HTML והדבק בעורך Confluence במצב HTML';
+                    exportDiv.appendChild(hint);
+
+                    bubble.appendChild(exportDiv);
+                }
+
                 const reportDiv = document.createElement('div');
                 reportDiv.style.cssText = 'background: white; padding: 25px; margin-top: 15px; border-radius: 12px; border: 1px solid #dfe1e6; overflow-x: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.05);';
                 reportDiv.innerHTML = data.report.content;
@@ -417,11 +530,20 @@
                         const card = document.createElement('div');
                         const priority = issue.fields.priority?.name || 'Medium';
                         card.className = `issue-card priority-${priority.toLowerCase()}`;
+
+                        // Build assignee display with proper RTL handling
+                        const assignee = issue.fields.assignee?.displayName || 'לא משויך';
+                        const reporter = issue.fields.reporter?.displayName || 'Unknown';
+                        const assigneeInfo = issue.fields.assignee
+                            ? `<span style="direction: ltr; display: inline-block;">👤 ${assignee}</span>`
+                            : '<span style="color: #6b778c; direction: ltr; display: inline-block;">👤 לא משויך</span>';
+
                         card.innerHTML = `
                             <div class="issue-key">${issue.key}</div>
                             <div class="issue-summary">${issue.fields.summary}</div>
                             <div class="issue-meta">
-                                Priority: ${priority} | 
+                                ${assigneeInfo} |
+                                Priority: ${priority} |
                                 Type: ${issue.fields.issuetype.name} |
                                 Status: ${issue.fields.status.name}
                             </div>
@@ -512,34 +634,105 @@
         async function sendQuery() {
             const query = queryInput.value.trim();
             if (!query) return;
-            
+
+            // Store last query for context
+            lastQuery = query;
+
+            // Check for help command
+            const lowerQuery = query.toLowerCase();
+            if (lowerQuery === 'עזרה' || lowerQuery === 'help' || lowerQuery === '?' ||
+                lowerQuery === 'הצג דוגמאות נוספות') {
+                // Add user message
+                addMessage('user', query);
+                queryInput.value = '';
+
+                // Show help message
+                const helpMessage = `
+<h3>📚 מדריך שימוש</h3>
+
+<h4>🔍 חיפוש נושאים:</h4>
+<ul>
+  <li>הצג את כל הבאגים</li>
+  <li>הצג נושאים בעדיפות גבוהה</li>
+  <li>חפש נושאים בסטטוס In Progress</li>
+  <li>הצג נושאים פעילים</li>
+</ul>
+
+<h4>📅 שאילתות ספרינט:</h4>
+<ul>
+  <li>הצג נושאים בספרינט 1</li>
+  <li>הצג משימות בספרינטים עתידיים</li>
+  <li>הצג משימות בביצוע בספרינטים עתידיים</li>
+</ul>
+
+<h4>👥 משימות לפי משתמש:</h4>
+<ul>
+  <li>הצג משימות משויכות לי</li>
+  <li>הצג משימות משויכות ל-Kof Adam</li>
+  <li>הצג משימות משויכות ל-Kof Adam בספרינט 2</li>
+</ul>
+
+<h4>📊 יצירת דוחות:</h4>
+<ul>
+  <li>צור דוח ספרינט 1</li>
+  <li>צור דוח באגים</li>
+  <li>צור דוח סטטוס</li>
+  <li>צור דוח של משימות בספרינטים עתידיים</li>
+  <li>צור דוח באגים ופרסם ל-Confluence</li>
+</ul>
+
+<h4>📚 Confluence:</h4>
+<ul>
+  <li>הצג דפי Confluence</li>
+  <li>חפש ב-Confluence נושאים על OAuth</li>
+</ul>
+
+<p style="margin-top: 20px; color: #5e6c84;">💡 טיפ: לחץ על אחד הכפתורים למעלה כדי לנסות שאילתא לדוגמה!</p>
+                `;
+
+                addMessage('assistant', helpMessage);
+                updateSuggestions('help');
+                return;
+            }
+
             // Add user message
             addMessage('user', query);
             queryInput.value = '';
-            
+
             // Disable input
             sendBtn.disabled = true;
             sendBtn.innerHTML = '<div class="loading"></div>';
-            
+
             try {
                 const response = await fetch(`${window.API_URL}/api/query`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ query })
                 });
-                
+
                 const result = await response.json();
-                
+
                 // Add assistant response
                 addMessage('assistant', result.message, result);
-                
+
+                // Update suggestions based on query context
+                if (lowerQuery.includes('באג') || lowerQuery.includes('bug')) {
+                    updateSuggestions('afterBugs');
+                } else if (lowerQuery.includes('ספרינט') || lowerQuery.includes('sprint')) {
+                    updateSuggestions('afterSprint');
+                } else if (lowerQuery.includes('סיכום') || lowerQuery.includes('summary')) {
+                    updateSuggestions('afterSummary');
+                } else {
+                    updateSuggestions('initial');
+                }
+
             } catch (error) {
-                addMessage('assistant', '❌ Error: ' + error.message);
+                addMessage('assistant', '❌ שגיאה: ' + error.message);
             } finally {
                 sendBtn.disabled = false;
-                sendBtn.textContent = 'Send';
+                sendBtn.textContent = 'שלח';
             }
         }
     </script>

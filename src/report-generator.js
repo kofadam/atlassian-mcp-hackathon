@@ -300,24 +300,36 @@ function generateGenericReport(issues, date) {
 // Add this function to handle report generation requests in your NLP processor
 export function detectReportIntent(query) {
   const lowerQuery = query.toLowerCase();
-  
+
   const reportPatterns = [
+    // English patterns
+    { pattern: /(?:create|generate|make)(?:\s+a)?\s+report\s+(?:of|for)\s+(?:all\s+)?(?:future|upcoming)\s+sprints?\s+(?:in progress\s+)?tasks?/i, type: 'future-sprints' },
     { pattern: /generate (?:a )?(?:sprint \d+ |sprint )?report/i, type: 'sprint' },
     { pattern: /create (?:a )?bug report/i, type: 'bug' },
     { pattern: /make (?:a )?status report/i, type: 'status' },
     { pattern: /publish (?:a )?report to confluence/i, type: 'generic' },
-    { pattern: /create (?:a )?summary (?:in|for|to) confluence/i, type: 'status' }
+    { pattern: /create (?:a )?summary (?:in|for|to) confluence/i, type: 'status' },
+
+    // Hebrew patterns - דוח (report), ייצר/צור (generate/create)
+    { pattern: /(?:ייצר|צור|תייצר|תוכל לייצר|אפשר לייצר|תן לי|הכן)(?:\s+לי)?(?:\s+את)?\s+דוח(?:\s+של)?\s+(?:ספרינטים עתידיים|כל הספרינטים העתידיים)/i, type: 'future-sprints' },
+    { pattern: /(?:ייצר|צור|תייצר|תוכל לייצר|אפשר לייצר|תן לי|הכן)(?:\s+לי)?(?:\s+את)?\s+דוח(?:\s+של)?\s+ספרינט/i, type: 'sprint' },
+    { pattern: /(?:ייצר|צור|תייצר|תוכל לייצר|אפשר לייצר|תן לי|הכן)(?:\s+לי)?(?:\s+את)?\s+דוח(?:\s+של)?\s+(?:באגים|באגס|תקלות)/i, type: 'bug' },
+    { pattern: /(?:ייצר|צור|תייצר|תוכל לייצר|אפשר לייצר|תן לי|הכן)(?:\s+לי)?(?:\s+את)?\s+דוח(?:\s+של)?\s+(?:סטטוס|מצב|התקדמות)/i, type: 'status' },
+    { pattern: /(?:פרסם|פרסום|העלה|העלאה)(?:\s+את)?\s+דוח\s+ל[\s-]?confluence/i, type: 'generic' },
+    { pattern: /דוח\s+ספרינט/i, type: 'sprint' },
+    { pattern: /דוח\s+באגים/i, type: 'bug' },
+    { pattern: /דוח\s+סטטוס/i, type: 'status' }
   ];
-  
+
   for (const { pattern, type } of reportPatterns) {
-    if (pattern.test(lowerQuery)) {
+    if (pattern.test(query)) {
       return {
         intent: 'generateReport',
         reportType: type,
-        shouldPublish: lowerQuery.includes('confluence') || lowerQuery.includes('publish')
+        shouldPublish: lowerQuery.includes('confluence') || query.includes('קונפלואנס') || lowerQuery.includes('publish') || query.includes('פרסם')
       };
     }
   }
-  
+
   return null;
 }

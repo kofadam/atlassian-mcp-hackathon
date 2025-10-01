@@ -4,12 +4,42 @@ Natural language AI assistant for Jira & Confluence using Atlassian's Model Cont
 
 ## 🎯 What This Does
 
-This web-based AI assistant allows you to interact with Jira and Confluence using natural language:
-- **Ask questions in plain English** - "Show me all bugs" or "What's the project status?"
-- **Search intelligently** - "Find issues about OAuth" or "Show database problems"
-- **Get instant insights** - Real-time project summaries and statistics
-- **Beautiful visual interface** - Color-coded issue cards and interactive dashboard
+This web-based AI assistant allows you to interact with Jira and Confluence using natural language - **in Hebrew and English**:
+- **Ask questions naturally** - "הצג את כל הבאגים" or "Show me all bugs"
+- **Search intelligently** - "חפש נושאים על OAuth" or "Find database issues"
+- **Generate reports** - "צור דוח ספרינט" or "Create sprint report"
+- **Advanced queries** - "הצג משימות משויכות ל-Kof Adam בספרינט 2"
+- **Beautiful Hebrew-first interface** - RTL support with color-coded issue cards
+- **Export & Share** - Download reports or publish directly to Confluence
 - **Zero infrastructure cost** - Uses Atlassian's hosted MCP server
+
+## ✨ Key Features
+
+### 🌍 Bilingual Natural Language Processing
+- **Hebrew & English support** - Seamless switching between languages
+- **Context-aware suggestions** - Smart query hints that adapt to your workflow
+- **Built-in help system** - Type "עזרה" or "help" for guidance
+
+### 🎯 Advanced Query Capabilities
+- **User-specific filtering** - "Show tasks assigned to [name]"
+- **Sprint management** - Query current, future, or specific sprints
+- **Status-based searches** - Find issues by status, priority, or type
+- **Fixed bugs tracking** - Separate queries for done/fixed issues
+- **Combined filters** - "Show [user]'s tasks in sprint X with status Y"
+
+### 📊 Report Generation
+- **Sprint reports** - Complete sprint summaries with stats
+- **Bug reports** - Priority-sorted bug analysis
+- **Status reports** - Project-wide progress tracking
+- **Future sprints reports** - Planning ahead with upcoming sprint data
+- **Export options** - Download HTML or publish directly to Confluence
+
+### 🎨 User Experience
+- **Hebrew-first RTL interface** - Proper right-to-left text handling
+- **Color-coded issue cards** - Visual priority and status indicators
+- **Assignee display** - See who's working on what
+- **Interactive chips** - Click suggestions to try example queries
+- **Real-time updates** - Always shows current data from Jira
 
 ## 🏗️ Architecture
 
@@ -83,11 +113,26 @@ Open your browser to: `http://localhost:3000`
 
 ### 4. Start Chatting!
 
-Try these natural language queries:
-- "Show me all bugs"
-- "Give me a project summary"
-- "Find issues about OAuth"
-- "What are all the open issues?"
+Try these natural language queries (Hebrew or English):
+
+**Search & Browse:**
+- "הצג את כל הבאגים" / "Show me all bugs"
+- "הצג נושאים בעדיפות גבוהה" / "Show high priority issues"
+- "חפש נושאים על OAuth" / "Find issues about OAuth"
+- "הצג משימות משויכות לי" / "Show my assigned tasks"
+
+**Advanced Queries:**
+- "הצג משימות משויכות ל-Kof Adam בספרינט 2"
+- "הצג משימות בביצוע בספרינטים עתידיים"
+- "הצג באגים שתוקנו" / "Show fixed bugs"
+
+**Reports:**
+- "צור דוח ספרינט 1" / "Create sprint 1 report"
+- "צור דוח באגים" / "Create bug report"
+- "צור דוח באגים ופרסם ל-Confluence"
+
+**Help:**
+- Type "עזרה" or "help" or click the help button for full list of examples
 
 ---
 

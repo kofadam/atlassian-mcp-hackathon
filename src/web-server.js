@@ -15,6 +15,73 @@ const __dirname = path.dirname(__filename);
 let mcpClient = null;
 let cloudId = null;
 let projectKey = null;
+let cachedSpaceInfo = null; // Cache space info to avoid repeated lookups
+
+async function getConfluenceSpaceInfo() {
+  // Return cached info if available
+  if (cachedSpaceInfo) {
+    return cachedSpaceInfo;
+  }
+
+  try {
+    // Search for any Confluence page to get space information
+    const searchResult = await mcpClient.callTool({
+      name: 'searchConfluenceUsingCql',
+      arguments: {
+        cloudId: cloudId,
+        cql: 'type=page',
+        limit: 1
+      }
+    });
+
+    const searchData = JSON.parse(searchResult.content[0].text);
+
+    if (!searchData.results || searchData.results.length === 0) {
+      throw new Error('No Confluence pages found. Please create at least one page in Confluence first.');
+    }
+
+    const firstPage = searchData.results[0];
+
+    // Extract space key from the resultGlobalContainer or _expandable
+    let spaceKey = null;
+
+    if (firstPage.resultGlobalContainer && firstPage.resultGlobalContainer.displayUrl) {
+      // Extract from /spaces/SPACEKE format
+      const match = firstPage.resultGlobalContainer.displayUrl.match(/\/spaces\/([A-Z0-9]+)/);
+      if (match) {
+        spaceKey = match[1];
+      }
+    }
+
+    if (!spaceKey && firstPage._expandable && firstPage._expandable.space) {
+      // Extract from /rest/api/space/SPACEKEY format
+      const match = firstPage._expandable.space.match(/\/space\/([A-Z0-9]+)/);
+      if (match) {
+        spaceKey = match[1];
+      }
+    }
+
+    if (!spaceKey) {
+      console.log('   🔍 Full page object:', JSON.stringify(firstPage, null, 2));
+      throw new Error('Could not extract space key from Confluence search results');
+    }
+
+    const spaceInfo = {
+      key: spaceKey,
+      name: firstPage.resultGlobalContainer?.title || spaceKey
+    };
+
+    console.log('   📚 Extracted space key:', spaceKey);
+
+    // Cache the space info
+    cachedSpaceInfo = spaceInfo;
+    console.log(`   📚 Found Confluence space: ${spaceInfo.name} (${spaceInfo.key}), ID: ${spaceInfo.id}`);
+
+    return spaceInfo;
+  } catch (error) {
+    throw new Error(`Failed to get Confluence space info: ${error.message}`);
+  }
+}
 
 async function connectMCP() {
   if (mcpClient) return mcpClient;
@@ -84,14 +151,31 @@ async function processQuery(query) {
       
       // Handle different report types with specific JQL
       if (reportIntent.reportType === 'sprint') {
-        // Check if query mentions a specific sprint number
-        const sprintMatch = query.match(/sprint\s+(\d+)/i);
+        // Check if query mentions a specific sprint number (English or Hebrew)
+        const sprintMatch = query.match(/(?:sprint|ספרינט)\s+(\d+)/i);
         if (sprintMatch) {
           jql += ` AND sprint = "Sprint ${sprintMatch[1]}"`;
           console.log(`   Generating report for Sprint ${sprintMatch[1]}`);
         } else {
           jql += ' AND sprint in openSprints()';
           console.log('   Generating report for current sprint');
+        }
+      } else if (reportIntent.reportType === 'future-sprints') {
+        jql += ' AND sprint in futureSprints()';
+        // Check if query includes status filter
+        if (query.toLowerCase().includes('in progress') || query.includes('בביצוע') || query.includes('בתהליך')) {
+          jql += ' AND status = "In Progress"';
+          console.log('   Generating report for future sprints in progress');
+        } else {
+          console.log('   Generating report for future sprints');
+        }
+        // Check if query includes assignee filter
+        const nameMatch = query.match(/(?:to|for|של|assigned to)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
+        if (nameMatch) {
+          const personName = nameMatch[1];
+          jql += ' AND assignee is not EMPTY';
+          console.log(`   Filtering report by assignee: ${personName}`);
+          reportIntent.filterByAssignee = personName;
         }
       } else if (reportIntent.reportType === 'bug') {
         jql += ' AND type = Bug';
@@ -102,88 +186,109 @@ async function processQuery(query) {
       }
       
       console.log(`   JQL: ${jql}`);
-      
+
       const searchResult = await mcpClient.callTool({
         name: 'searchJiraIssuesUsingJql',
         arguments: {
           cloudId: cloudId,
           jql: jql,
-          maxResults: 100
+          maxResults: 100,
+          fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'reporter', 'created', 'updated']
         }
       });
-      
-      const issues = JSON.parse(searchResult.content[0].text).issues || [];
+
+      let issues = JSON.parse(searchResult.content[0].text).issues || [];
       console.log(`   Found ${issues.length} issues for report`);
+
+      // Apply client-side assignee filter if specified
+      if (reportIntent.filterByAssignee) {
+        const targetName = reportIntent.filterByAssignee.toLowerCase();
+        console.log(`   🔍 Filtering report by assignee: ${reportIntent.filterByAssignee}`);
+        issues = issues.filter(issue => {
+          const assigneeName = issue.fields.assignee?.displayName || '';
+          return assigneeName.toLowerCase().includes(targetName);
+        });
+        console.log(`   After filtering: ${issues.length} issues`);
+      }
       
       const report = generateReport(issues, reportIntent.reportType);
       
       // Check if we should publish to Confluence
       if (reportIntent.shouldPublish) {
-        console.log('   Publishing report to Confluence...');
-        
+        console.log('   📤 Publishing report to Confluence...');
+
         try {
-          // First, search for any Confluence content to get a valid space ID
-          const searchResult = await mcpClient.callTool({
-            name: 'searchConfluenceUsingCql',
-            arguments: {
-              cloudId: cloudId,
-              cql: '',
-              limit: 1
-            }
-          });
-          
-          const searchData = JSON.parse(searchResult.content[0].text);
-          
-          if (!searchData.results || searchData.results.length === 0) {
-            throw new Error('No Confluence content found to determine space');
-          }
-          
-          // Get the space ID from the first result
-          const spaceId = searchData.results[0].space.id;
-          const spaceKey = searchData.results[0].space.key;
-          
-          console.log(`   Using space: ${spaceKey} (ID: ${spaceId})`);
-          
-          // Create the Confluence page with the numeric space ID
+          // Get Confluence space info (cached after first call)
+          const spaceInfo = await getConfluenceSpaceInfo();
+
+          console.log(`   📝 Creating page in space: ${spaceInfo.name} (${spaceInfo.key})`);
+
+          // Create the Confluence page using space key
           const createResult = await mcpClient.callTool({
             name: 'createConfluencePage',
             arguments: {
               cloudId: cloudId,
-              spaceId: spaceId.toString(),  // Use the numeric space ID
+              spaceKey: spaceInfo.key,  // Use space key instead of ID
               title: report.title,
               body: report.content,
               bodyFormat: 'storage'
             }
           });
-          
+
           const createdPage = JSON.parse(createResult.content[0].text);
-          console.log('   Created page response:', JSON.stringify(createdPage, null, 2));
-          
+
+          // Check for errors in response
           if (createdPage.error) {
-            throw new Error(createdPage.message);
+            throw new Error(createdPage.message || 'Unknown error creating page');
           }
-          
+
+          // Extract page ID (different APIs use different field names)
           const pageId = createdPage.id || createdPage.pageId || createdPage._id;
-          const pageUrl = `https://kofadam.atlassian.net/wiki/spaces/${spaceKey}/pages/${pageId}`;
-          
-          console.log(`   ✅ Report published to Confluence: ${pageUrl}`);
-          
+
+          if (!pageId) {
+            console.log('   ⚠️ Response:', JSON.stringify(createdPage, null, 2));
+            throw new Error('No page ID in response');
+          }
+
+          const pageUrl = `https://kofadam.atlassian.net/wiki/spaces/${spaceInfo.key}/pages/${pageId}`;
+
+          console.log(`   ✅ Report published successfully!`);
+          console.log(`   🔗 ${pageUrl}`);
+
           return {
             type: 'report',
-            message: `Generated and published ${reportIntent.reportType} report to Confluence! View at: ${pageUrl}`,
+            message: `✅ דוח פורסם ל-Confluence בהצלחה!\n🔗 ${pageUrl}`,
             report: report,
             confluenceUrl: pageUrl
           };
         } catch (error) {
-          console.error('   ⚠️ Could not publish to Confluence:', error.message);
-          // Still return the report even if publishing failed
+          console.error('   ❌ Could not publish to Confluence:', error.message);
+
+          // Return the report with helpful export instructions
+          return {
+            type: 'report',
+            message: `✅ דוח נוצר בהצלחה! הדוח מוכן להצגה למטה.`,
+            report: report,
+            exportInstructions: `📋 כיצד לייצא את הדוח:\n\n• העתק את תוכן הדוח (HTML)\n• פתח Confluence וצור דף חדש\n• הדבק בעורך (במצב HTML)\n• לחלופין: שמור כקובץ HTML ופתח בדפדפן`,
+            exportOptions: {
+              html: report.content,
+              canCopy: true,
+              canDownload: true
+            }
+          };
         }
       }
 
+      // Report generated successfully (not publishing to Confluence)
       return {
         type: 'report',
-        message: `Generated ${reportIntent.reportType} report`,
-        report: report
+        message: `✅ דוח נוצר בהצלחה!`,
+        report: report,
+        exportOptions: {
+          html: report.content,
+          canCopy: true,
+          canDownload: true
+        }
       };
     }
     
@@ -322,14 +427,15 @@ async function processQuery(query) {
     }
     
     console.log(`🔍 Executing JQL: ${jql}`);
-    
+
     try {
       const searchPromise = mcpClient.callTool({
         name: 'searchJiraIssuesUsingJql',
         arguments: {
           cloudId: cloudId,
           jql: jql,
-          maxResults: 50
+          maxResults: 50,
+          fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'reporter', 'created', 'updated']
         }
       });
       
@@ -352,10 +458,28 @@ async function processQuery(query) {
         };
       }
       
-      const issues = data.issues || [];
+      let issues = data.issues || [];
+
+      // Apply client-side assignee filter if specified
+      if (nlpResult.filterByAssignee) {
+        const targetName = nlpResult.filterByAssignee.toLowerCase();
+        console.log(`   🔍 Filtering by assignee: ${nlpResult.filterByAssignee}`);
+        issues = issues.filter(issue => {
+          const assigneeName = issue.fields.assignee?.displayName || '';
+          return assigneeName.toLowerCase().includes(targetName);
+        });
+      }
+
       const total = issues.length;
-      
       console.log(`   📊 Found ${total} issues`);
+
+      // Debug: Log assignee info for first few issues
+      if (jql.includes('assignee')) {
+        console.log('   🔍 Assignee Debug (first 3 issues):');
+        issues.slice(0, 3).forEach(issue => {
+          console.log(`      ${issue.key}: assignee = ${issue.fields.assignee?.displayName || 'NULL/EMPTY'}`);
+        });
+      }
       
       // Determine the response type based on the issues
       let responseType = 'issues';
