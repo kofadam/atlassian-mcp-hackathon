@@ -71,6 +71,12 @@ export function processNaturalLanguage(query) {
       he: /(?:סיכום פרויקט|סיכום|סטטוס|מצב הפרויקט|תן לי סיכום|מצב|תמונת מצב|דשבורד|לוח בקרה)/
     },
 
+    // Confluence summarization patterns
+    summarizeConfluence: {
+      en: /(?:summarize|summarise|summary of|give me a summary of|sum up)(?: the)?(?: confluence)?(?: page| document| doc)?(?:\s+(?:titled|named|called))?\s+(.+)/i,
+      he: /(?:סכם|תן סיכום|לסכם)(?: את)?(?: עמוד)?(?: המסמך)?(?: מ)?(?:קונפלואנס)?\s+(.+)/
+    },
+
     // Backlog patterns
     backlog: {
       en: /(?:backlog|product backlog|show backlog)/i,
@@ -399,12 +405,34 @@ export function processNaturalLanguage(query) {
     };
   }
 
+  // *** CHECK FOR CONFLUENCE SUMMARIZATION FIRST ***
+  const summarizeMatch = patterns.summarizeConfluence.en.test(lowerQuery) ||
+                        (isHebrew && patterns.summarizeConfluence.he.test(query));
+
+  if (summarizeMatch) {
+    const match = lowerQuery.match(patterns.summarizeConfluence.en) || query.match(patterns.summarizeConfluence.he);
+    if (match && match[1]) {
+      const pageTitle = match[1].trim();
+      return {
+        intent: 'summarize-confluence',
+        pageTitle: pageTitle,
+        description: `Summarize Confluence page: "${pageTitle}"`
+      };
+    }
+  }
+
   // *** CHECK FOR CONFLUENCE FIRST - before any Jira patterns ***
   // This ensures "initiatives from confluence" goes to Confluence, not Jira epics
   if (lowerQuery.includes('confluence') || lowerQuery.includes('קונפלואנס') ||
       (lowerQuery.includes('from confluence')) || (query.includes('מ-confluence'))) {
     // Check if there's a specific term to search for
-    const searchTermMatch = lowerQuery.match(/(?:show|get|find|search|חפש|הצג|מצא)(?:\s+(?:me|all|את))?\s+(?:all\s+)?(.+?)\s+(?:from|in|on|ב|מ-|מתוך)?\s*confluence/i);
+    // Pattern 1: "search confluence for X" or "חפש ב-confluence X"
+    let searchTermMatch = lowerQuery.match(/(?:show|get|find|search|חפש|הצג|מצא)(?:\s+(?:me|all|את))?\s*confluence\s+(?:for|about|regarding|ב|על|בנושא)\s+(.+)/i);
+    // Pattern 2: "show X from confluence"
+    if (!searchTermMatch) {
+      searchTermMatch = lowerQuery.match(/(?:show|get|find|search|חפש|הצג|מצא)(?:\s+(?:me|all|את))?\s+(?:all\s+)?(.+?)\s+(?:from|in|on|ב|מ-|מתוך)\s*confluence/i);
+    }
+
     if (searchTermMatch) {
       const searchTerm = searchTermMatch[1].trim().replace(/information|content|data|pages?/gi, '').trim();
       if (searchTerm && searchTerm.length > 2) {

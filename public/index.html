@@ -654,6 +654,30 @@
                 bubble.appendChild(dashboardDiv);
                 }
 
+                // Handle Confluence page summary
+                if (data.type === 'confluence-summary') {
+                    const summaryCard = document.createElement('div');
+                    summaryCard.style.cssText = 'background: linear-gradient(135deg, #2684ff 0%, #0052cc 100%); color: white; padding: 20px; border-radius: 12px; margin-top: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+
+                    summaryCard.innerHTML = `
+                        <h3 style="margin: 0 0 15px 0; font-size: 1.2em;">
+                            📄 ${data.data.title}
+                        </h3>
+                        <div style="background: rgba(255,255,255,0.15); padding: 15px; border-radius: 8px; margin-bottom: 12px;">
+                            <div style="font-size: 0.9em; line-height: 1.6; white-space: pre-wrap;">
+                                ${data.data.summary}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 15px; font-size: 0.85em; opacity: 0.9;">
+                            <span>📊 ${data.data.wordCount} words</span>
+                            <span>🤖 ${data.data.model || 'Claude'}</span>
+                            ${data.data.pageUrl ? `<span style="cursor: pointer;" onclick="window.open('${data.data.pageUrl}', '_blank')">🔗 View Page</span>` : ''}
+                        </div>
+                    `;
+
+                    bubble.appendChild(summaryCard);
+                }
+
                 // Handle Confluence pages
                 if (data.type === 'confluence') {
                     const grid = document.createElement('div');
@@ -697,7 +721,7 @@
 
                         grid.appendChild(card);
                     });
-                
+
                     bubble.appendChild(grid);
                 }
             }
@@ -729,57 +753,56 @@
 
                 // Show help message
                 const helpMessage = `
-<h3>📚 מדריך שימוש</h3>
+<h3>📚 Usage Guide</h3>
 
-<h4>🔍 חיפוש נושאים:</h4>
+<h4>🔍 Search Issues:</h4>
 <ul>
-  <li>הצג את כל הבאגים</li>
-  <li>הצג נושאים בעדיפות גבוהה</li>
-  <li>חפש נושאים בסטטוס In Progress</li>
-  <li>הצג נושאים פעילים</li>
+  <li>Show me all bugs</li>
+  <li>Find high priority issues</li>
+  <li>Search for issues about OAuth</li>
+  <li>Show open issues</li>
+  <li>Display fixed bugs</li>
 </ul>
 
-<h4>📅 שאילתות ספרינט:</h4>
+<h4>📅 Sprint Queries:</h4>
 <ul>
-  <li>הצג נושאים בספרינט 1</li>
-  <li>הצג משימות בספרינטים עתידיים</li>
-  <li>הצג משימות בביצוע בספרינטים עתידיים</li>
+  <li>What's in the current sprint?</li>
+  <li>Show sprint 1 issues</li>
+  <li>Display future sprint tasks</li>
 </ul>
 
-<h4>👥 משימות לפי משתמש:</h4>
+<h4>👥 User-Specific:</h4>
 <ul>
-  <li>הצג משימות משויכות לי</li>
-  <li>הצג משימות משויכות ל-Kof Adam</li>
-  <li>הצג משימות משויכות ל-Kof Adam בספרינט 2</li>
+  <li>Show my tasks</li>
+  <li>Show tasks assigned to John</li>
+  <li>Display John's tasks in sprint 2</li>
 </ul>
 
-<h4>📊 יצירת דוחות:</h4>
+<h4>📊 Generate Reports:</h4>
 <ul>
-  <li>צור דוח ספרינט 1</li>
-  <li>צור דוח באגים</li>
-  <li>צור דוח סטטוס</li>
-  <li>Generate PI 26.1 report</li>
-  <li>צור דוח של משימות בספרינטים עתידיים</li>
-  <li>צור דוח באגים ופרסם ל-Confluence</li>
+  <li>Generate sprint 1 report</li>
+  <li>Create a bug report</li>
+  <li>Create status report</li>
+  <li>Generate PI 25.4 report</li>
 </ul>
 
-<h4>🎯 SAFe Program Increment (PI):</h4>
+<h4>🎯 SAFe/PI Tracking:</h4>
 <ul>
-  <li>Show PI 26.1 objectives</li>
-  <li>Show PI 26.1 features</li>
-  <li>Show PI 26.1 risks</li>
-  <li>Show owned risks</li>
-  <li>Show mitigated risks</li>
+  <li>Show PI 25.4 objectives</li>
+  <li>Show PI 25.4 features</li>
+  <li>Display PI risks</li>
+  <li>Show ROAM-Owned risks</li>
   <li>Show current PI</li>
 </ul>
 
 <h4>📚 Confluence:</h4>
 <ul>
-  <li>הצג דפי Confluence</li>
-  <li>חפש ב-Confluence נושאים על OAuth</li>
+  <li>Search confluence for API documentation</li>
+  <li>Summarize KMD Home</li>
+  <li>Summarize Getting Started guide</li>
 </ul>
 
-<p style="margin-top: 20px; color: #5e6c84;">💡 טיפ: לחץ על אחד הכפתורים למעלה כדי לנסות שאילתא לדוגמה!</p>
+<p style="margin-top: 20px; color: #5e6c84;">💡 Tip: Click one of the suggestion chips above to try an example query!</p>
                 `;
 
                 addMessage('assistant', helpMessage);

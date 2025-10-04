@@ -169,6 +169,34 @@ class AtlassianRestClient {
   }
 
   /**
+   * Create Confluence page
+   */
+  async createConfluencePage(spaceKey, title, content, parentId = null) {
+    const url = `${this.confluenceBaseUrl}/rest/api/content`;
+
+    const body = {
+      type: 'page',
+      title: title,
+      space: { key: spaceKey },
+      body: {
+        storage: {
+          value: content,
+          representation: 'storage'
+        }
+      }
+    };
+
+    if (parentId) {
+      body.ancestors = [{ id: parentId }];
+    }
+
+    return this.request(url, {
+      method: 'POST',
+      body: body
+    });
+  }
+
+  /**
    * Get all Jira projects
    */
   async getProjects() {

@@ -1,84 +1,47 @@
-# 🚀 Atlassian MCP Hackathon POC
+# Atlassian AI Assistant
 
-Natural language AI assistant for Jira & Confluence using Atlassian's Model Context Protocol (MCP) Server.
+Natural language interface for Jira and Confluence with support for local and cloud deployments.
 
-## 🎯 What This Does
+## Overview
 
-This web-based AI assistant allows you to interact with Jira and Confluence using natural language - **in Hebrew and English**:
-- **Ask questions naturally** - "הצג את כל הבאגים" or "Show me all bugs"
-- **Search intelligently** - "חפש נושאים על OAuth" or "Find database issues"
-- **Generate reports** - "צור דוח ספרינט" or "Create sprint report"
-- **Advanced queries** - "הצג משימות משויכות ל-Kof Adam בספרינט 2"
-- **Beautiful Hebrew-first interface** - RTL support with color-coded issue cards
-- **Export & Share** - Download reports or publish directly to Confluence
-- **Zero infrastructure cost** - Uses Atlassian's hosted MCP server
+This web-based assistant provides a conversational interface to interact with Jira and Confluence using natural language queries in both Hebrew and English. Query issues, generate reports, and summarize Confluence pages without writing JQL or navigating complex UIs.
 
-## ✨ Key Features
+## Features
 
-### 🌍 Bilingual Natural Language Processing
-- **Hebrew & English support** - Seamless switching between languages
-- **Context-aware suggestions** - Smart query hints that adapt to your workflow
-- **Built-in help system** - Type "עזרה" or "help" for guidance
+- **Natural language queries** - Ask questions in plain English or Hebrew
+- **Issue search and filtering** - Find bugs, tasks, stories by status, priority, assignee, or sprint
+- **Report generation** - Create sprint reports, bug reports, and PI (Program Increment) summaries
+- **Confluence integration** - Search pages and generate document summaries
+- **Bilingual support** - Full Hebrew and English interface with RTL support
+- **SAFe/PI tracking** - Enterprise Agile support with PI objectives, features, and ROAM risk tracking
 
-### 🎯 Advanced Query Capabilities
-- **User-specific filtering** - "Show tasks assigned to [name]"
-- **Sprint management** - Query current, future, or specific sprints
-- **Status-based searches** - Find issues by status, priority, or type
-- **Fixed bugs tracking** - Separate queries for done/fixed issues
-- **Combined filters** - "Show [user]'s tasks in sprint X with status Y"
-
-### 📊 Report Generation
-- **Sprint reports** - Complete sprint summaries with stats
-- **Bug reports** - Priority-sorted bug analysis
-- **Status reports** - Project-wide progress tracking
-- **Future sprints reports** - Planning ahead with upcoming sprint data
-- **Export options** - Download HTML or publish directly to Confluence
-
-### 🎨 User Experience
-- **Hebrew-first RTL interface** - Proper right-to-left text handling
-- **Color-coded issue cards** - Visual priority and status indicators
-- **Assignee display** - See who's working on what
-- **Interactive chips** - Click suggestions to try example queries
-- **Real-time updates** - Always shows current data from Jira
-
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────┐
-│   Web Browser   │  ← Beautiful UI with natural language chat
-│  (Your Laptop)  │
+│   Web Browser   │  ← Natural language chat interface
+│   (Port 3000)   │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  Web Server     │  ← Node.js backend (your Ubuntu server)
-│  (Port 3000)    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  mcp-remote     │  ← Atlassian's proxy
-│   (running)     │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Atlassian MCP   │  ← Cloud-hosted by Atlassian
-│    Server       │
+│  Node.js Server │  ← NLP processing, query routing
+│   (Express)     │
 └────────┬────────┘
          │
     ┌────┴────┐
     ▼         ▼
   Jira    Confluence
+  (REST API v2)
 ```
 
-## 📦 Prerequisites
+## Prerequisites
 
-- Node.js v20+ 
-- Atlassian Cloud account (free tier works!)
-- Jira and/or Confluence with some test data
+- Node.js v20+
+- Docker (for local Jira/Confluence deployment)
+- Jira and Confluence instances (local or cloud)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Install Dependencies
 
@@ -86,194 +49,159 @@ This web-based AI assistant allows you to interact with Jira and Confluence usin
 npm install
 ```
 
-### 2. Authenticate with Atlassian (First Time Only)
+### 2. Configure Environment
 
-**Terminal 1** - Start the MCP proxy (keep this running):
+Create a `.env` file:
 
 ```bash
-npx -y mcp-remote https://mcp.atlassian.com/v1/sse
+# Jira/Confluence credentials
+ATLASSIAN_EMAIL=your-username
+ATLASSIAN_API_TOKEN=your-password-or-token
+ATLASSIAN_DOMAIN=your-domain.atlassian.net
+
+# Base URLs
+JIRA_BASE_URL=https://your-domain.atlassian.net
+CONFLUENCE_BASE_URL=https://your-domain.atlassian.net/wiki
+
+# Default project
+DEFAULT_PROJECT_KEY=YOUR-PROJECT
+
+# Optional: Anthropic API for AI-powered summaries
+ANTHROPIC_API_KEY=sk-ant-your-key-here
 ```
 
-This will:
-- Open your browser for OAuth authentication
-- Save credentials locally
-- Keep a proxy connection running
+**Note**: For local Jira installations, use your password as the API token. For Atlassian Cloud, generate a Personal Access Token from your account settings.
 
-**⚠️ Keep this terminal open!** The connection must stay active.
-
-### 3. Start the Web Server
-
-**Terminal 2** - Launch the web interface:
+### 3. Start the Server
 
 ```bash
 npm run web
 ```
 
-Open your browser to: `http://localhost:3000`
+Open your browser to `http://localhost:3000`
 
-### 4. Start Chatting!
+## Local Deployment with Docker
 
-Try these natural language queries (Hebrew or English):
+For a fully local setup, deploy Jira and Confluence using Docker:
 
-**Search & Browse:**
-- "הצג את כל הבאגים" / "Show me all bugs"
-- "הצג נושאים בעדיפות גבוהה" / "Show high priority issues"
-- "חפש נושאים על OAuth" / "Find issues about OAuth"
-- "הצג משימות משויכות לי" / "Show my assigned tasks"
-
-**Advanced Queries:**
-- "הצג משימות משויכות ל-Kof Adam בספרינט 2"
-- "הצג משימות בביצוע בספרינטים עתידיים"
-- "הצג באגים שתוקנו" / "Show fixed bugs"
-
-**Reports:**
-- "צור דוח ספרינט 1" / "Create sprint 1 report"
-- "צור דוח באגים" / "Create bug report"
-- "צור דוח באגים ופרסם ל-Confluence"
-
-**Help:**
-- Type "עזרה" or "help" or click the help button for full list of examples
-
----
-
-## 🎮 Available Commands
-
-### Primary Interface - Web UI
 ```bash
-npm run web       # Launch web interface (PRIMARY)
+docker-compose up -d
 ```
 
-### Development & Testing
-```bash
-npm test          # Test MCP connection
-npm run setup-data    # Create mock Jira issues
-npm run fix-priorities # Update issue priorities
-```
+This starts:
+- Jira on port 8088
+- Confluence on port 8090
+- PostgreSQL on port 5432
 
-### Alternative Interfaces (Optional)
-```bash
-npm run ai        # Terminal chat interface
-npm run sprint    # CLI sprint report
-npm run triage    # CLI bug triage
-npm run release   # CLI release notes
-npm run gaps      # CLI knowledge gap analysis
-```
+See [LOCAL-JIRA-SETUP.md](LOCAL-JIRA-SETUP.md) for detailed setup instructions.
 
-## 🎪 Hackathon Demo Flow
+## Usage Examples
 
-### The Perfect 5-Minute Demo
+### Issue Queries
 
-**1. Opening (30 seconds)**
-- Open browser to your server: `http://your-server-ip:3000`
-- Show the clean, modern interface
+- "Show me all bugs"
+- "Find high priority issues"
+- "Show tasks assigned to John"
+- "What's in the current sprint?"
+- "Display fixed bugs"
 
-**2. Natural Language Demo (3 minutes)**
+### Report Generation
 
-Type or click these queries:
-1. **"Show me all bugs"** - Displays bug cards with color coding
-2. **"Give me a project summary"** - Shows dashboard with statistics
-3. **"Find issues about database"** - Demonstrates intelligent search
+- "Generate sprint 1 report"
+- "Create a bug report"
+- "Show PI 25.4 objectives"
+- "Generate PI 25.4 report"
 
-**3. Show the Value (1 minute)**
+### Confluence
 
-*"This AI assistant understands natural language and connects directly to our Jira and Confluence. No more switching between tools or writing complex JQL queries. Just ask what you need in plain English."*
+- "Search confluence for API documentation"
+- "Summarize Getting Started" (requires Anthropic API key for AI summaries, or uses free extractive mode)
 
-**4. Technical Highlights (30 seconds)**
-- Zero infrastructure cost (Atlassian hosts the MCP server)
-- 5-minute setup time
-- Works with existing Jira permissions
-- Real-time data, always current
+### SAFe/PI Tracking
 
-### Key Talking Points
+- "Show PI 25.4 features"
+- "Display PI risks"
+- "Show ROAM-Owned risks"
+- "Generate PI dashboard"
 
-✅ **Natural language interface** - No JQL knowledge required  
-✅ **Real-time data** - Always current, no stale reports  
-✅ **Zero infrastructure** - Uses Atlassian's hosted MCP server  
-✅ **5-minute setup** - From clone to running demo  
-✅ **Secure** - OAuth authentication, respects permissions  
-✅ **Production-ready** - Could deploy Monday morning  
+## Document Summarization
 
-## 🎨 Customization
+The system supports two modes for summarizing Confluence pages:
 
-### Adding New Scenarios
+1. **Free extractive summarization** (default) - Extracts first paragraphs, no API required
+2. **AI-powered summarization** - Uses Claude API for better summaries (requires Anthropic API key)
 
-Edit `src/index.js` and add a new command:
+To enable AI summaries, add your Anthropic API key to `.env`. Otherwise, free extractive summaries are used automatically.
+
+## Configuration
+
+### Adding NLP Patterns
+
+Edit `src/improved-nlp-processor.js` to add new query patterns:
 
 ```javascript
-program
-  .command('your-scenario')
-  .description('Your scenario description')
-  .action(async () => {
-    // Your logic here
-    const result = await callTool('jira_search_issues', {
-      jql: 'your JQL query'
-    });
-    // Process and display results
-  });
+patterns.myPattern = {
+  en: /pattern here/i,
+  he: /hebrew pattern/
+};
 ```
 
-### Available MCP Tools
+### Customizing Reports
 
-The Atlassian MCP Server provides these tools:
-- `jira_search_issues` - Search Jira with JQL
-- `jira_get_issue` - Get specific issue details
-- `jira_create_issue` - Create new issues
-- `jira_update_issue` - Update existing issues
-- `confluence_search` - Search Confluence with CQL
-- `confluence_get_page` - Get page content
-- `confluence_create_page` - Create new pages
-- `confluence_update_page` - Update existing pages
+Edit `src/report-generator.js` to modify report templates or add new report types.
 
-## 🐛 Troubleshooting
+## Project Structure
 
-### "Cannot connect to MCP Server"
-- Make sure `mcp-remote` is running in another terminal
-- Check authentication: `npx -y mcp-remote https://mcp.atlassian.com/v1/sse`
+```
+src/
+  ├── web-server.js              # Express server, query routing
+  ├── improved-nlp-processor.js  # Natural language processing
+  ├── report-generator.js        # Report generation
+  ├── atlassian-rest-client.js   # Jira/Confluence REST API client
+  └── confluence-summarizer.js   # Document summarization
+public/
+  └── index.html                 # Web UI
+scripts/
+  └── create-correct-pi-data.js  # PI test data generator
+```
 
-### "No results found"
-- Verify you have data in Jira/Confluence
-- Check your JQL/CQL queries
-- Ensure your Atlassian account has proper permissions
+## REST API Endpoints
 
-### "Node version error"
-- Upgrade to Node.js 20+: `nvm install 20 && nvm use 20`
+- `POST /api/query` - Process natural language query
+- `GET /api/confluence-pages` - List Confluence pages
 
-## 📊 Business Value
+## Troubleshooting
 
-### Time Savings
-- **Sprint planning**: 2 hours → 30 seconds
-- **Release notes**: 1 hour → 1 minute
-- **Bug triage**: 30 minutes → 10 seconds
+### Connection Issues
 
-### Consistency
-- No more missed issues in release notes
-- Standardized reporting format
-- Always up-to-date information
+- Verify Jira/Confluence URLs are accessible
+- Check credentials in `.env`
+- For local deployments, ensure Docker containers are running: `docker ps`
 
-### Scalability
-- Works with 10 issues or 10,000 issues
-- Multiple projects supported
-- Can be extended to other Atlassian tools
+### No Results Found
 
-## 🏆 Why This Wins Hackathons
+- Verify project key in `.env` matches your Jira project
+- Check that issues exist in the specified project
+- Review server logs for API errors
 
-1. **Solves Real Problems** - Every team using Jira faces these issues
-2. **Easy to Understand** - Clear value proposition
-3. **Impressive Tech** - Uses cutting-edge MCP protocol
-4. **Actually Works** - Fully functional, not just slides
-5. **Extensible** - Judges can see future potential
-6. **Production-Ready** - Could deploy today
+### Confluence Summarization Fails
 
-## 📝 License
+- Verify page title matches exactly (case-sensitive)
+- Check Confluence base URL includes `/wiki` path
+- Ensure user has permission to view the page
+
+## Development
+
+Run tests:
+```bash
+npm test
+```
+
+Create test data:
+```bash
+node scripts/create-correct-pi-data.js
+```
+
+## License
 
 MIT
-
-## 🙏 Acknowledgments
-
-- Atlassian for the MCP Server
-- Anthropic for the MCP protocol
-- The open-source community
-
----
-
-**Built for [Your Organization] Hackathon 2025** 🚀

@@ -8,6 +8,7 @@ import { config } from 'dotenv';
 import AtlassianRestClient from './atlassian-rest-client.js';
 import { processNaturalLanguage } from './improved-nlp-processor.js';
 import { generateReport, detectReportIntent } from './report-generator.js';
+import ConfluenceSummarizer from './confluence-summarizer.js';
 
 // Load environment variables
 config();
@@ -18,6 +19,7 @@ const __dirname = path.dirname(__filename);
 let atlassianClient = null;
 let projectKey = null;
 let cachedSpaceInfo = null; // Cache space info to avoid repeated lookups
+let confluenceSummarizer = null; // Confluence summarization service
 
 async function getConfluenceSpaceInfo() {
   // Return cached info if available
@@ -85,7 +87,8 @@ async function connectAtlassian() {
       email: process.env.ATLASSIAN_EMAIL,
       apiToken: process.env.ATLASSIAN_API_TOKEN,
       domain: process.env.ATLASSIAN_DOMAIN,
-      jiraBaseUrl: process.env.JIRA_BASE_URL
+      jiraBaseUrl: process.env.JIRA_BASE_URL,
+      confluenceBaseUrl: process.env.CONFLUENCE_BASE_URL
     });
 
     // Test connection
@@ -344,6 +347,49 @@ async function processQuery(query) {
       }
     }
     
+    // Handle Confluence summarization
+    if (nlpResult.intent === 'summarize-confluence') {
+      try {
+        console.log(`   Searching for page: "${nlpResult.pageTitle}"`);
+
+        // Search for the page by title
+        const pageData = await atlassianClient.getConfluencePageByTitle(nlpResult.pageTitle);
+
+        if (!pageData) {
+          return {
+            type: 'error',
+            message: `Could not find Confluence page titled "${nlpResult.pageTitle}"`
+          };
+        }
+
+        console.log(`   Found page: ${pageData.title} (ID: ${pageData.id})`);
+        console.log(`   Generating summary with Claude...`);
+
+        // Summarize the page
+        const summary = await confluenceSummarizer.summarizePage({
+          title: pageData.title,
+          body: pageData.body.storage.value,
+          id: pageData.id
+        });
+
+        return {
+          type: 'confluence-summary',
+          data: {
+            ...summary,
+            pageId: pageData.id,
+            pageUrl: pageData._links?.webui ? `${atlassianClient.confluenceBaseUrl}${pageData._links.webui}` : null
+          },
+          message: `Summary of "${pageData.title}"`
+        };
+      } catch (error) {
+        console.error('Confluence summarization error:', error.message);
+        return {
+          type: 'error',
+          message: `Failed to summarize page: ${error.message}`
+        };
+      }
+    }
+
     // Handle Confluence search
     if (nlpResult.intent === 'confluence') {
       try {
@@ -653,6 +699,20 @@ server.listen(PORT, HOST, async () => {
 
   try {
     await connectAtlassian();
+
+    // Initialize Confluence summarizer
+    const apiKey = (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your-api-key-here')
+      ? process.env.ANTHROPIC_API_KEY
+      : null;
+
+    confluenceSummarizer = new ConfluenceSummarizer(apiKey);
+
+    if (apiKey) {
+      console.log('✅ Confluence summarization enabled (AI-powered with Claude API)');
+    } else {
+      console.log('✅ Confluence summarization enabled (FREE extractive mode - no API key needed)');
+    }
+
     console.log(`\n✅ Server running at http://localhost:${PORT}`);
     console.log(`✅ Also accessible at http://10.100.102.110:${PORT}`);
     console.log('\n📱 Open in your browser to start chatting!\n');
