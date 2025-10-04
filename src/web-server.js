@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { config } from 'dotenv';
+import AtlassianRestClient from './atlassian-rest-client.js';
 import { processNaturalLanguage } from './improved-nlp-processor.js';
 import { generateReport, detectReportIntent } from './report-generator.js';
+
+// Load environment variables
+config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let mcpClient = null;
-let cloudId = null;
+let atlassianClient = null;
 let projectKey = null;
 let cachedSpaceInfo = null; // Cache space info to avoid repeated lookups
 
@@ -25,16 +27,7 @@ async function getConfluenceSpaceInfo() {
 
   try {
     // Search for any Confluence page to get space information
-    const searchResult = await mcpClient.callTool({
-      name: 'searchConfluenceUsingCql',
-      arguments: {
-        cloudId: cloudId,
-        cql: 'type=page',
-        limit: 1
-      }
-    });
-
-    const searchData = JSON.parse(searchResult.content[0].text);
+    const searchData = await atlassianClient.searchConfluencePages('type=page', { limit: 1 });
 
     if (!searchData.results || searchData.results.length === 0) {
       throw new Error('No Confluence pages found. Please create at least one page in Confluence first.');
@@ -46,7 +39,7 @@ async function getConfluenceSpaceInfo() {
     let spaceKey = null;
 
     if (firstPage.resultGlobalContainer && firstPage.resultGlobalContainer.displayUrl) {
-      // Extract from /spaces/SPACEKE format
+      // Extract from /spaces/SPACEKEY format
       const match = firstPage.resultGlobalContainer.displayUrl.match(/\/spaces\/([A-Z0-9]+)/);
       if (match) {
         spaceKey = match[1];
@@ -62,7 +55,7 @@ async function getConfluenceSpaceInfo() {
     }
 
     if (!spaceKey) {
-      console.log('   🔍 Full page object:', JSON.stringify(firstPage, null, 2));
+      console.log('   📄 Full page object:', JSON.stringify(firstPage, null, 2));
       throw new Error('Could not extract space key from Confluence search results');
     }
 
@@ -75,7 +68,7 @@ async function getConfluenceSpaceInfo() {
 
     // Cache the space info
     cachedSpaceInfo = spaceInfo;
-    console.log(`   📚 Found Confluence space: ${spaceInfo.name} (${spaceInfo.key}), ID: ${spaceInfo.id}`);
+    console.log(`   📚 Found Confluence space: ${spaceInfo.name} (${spaceInfo.key})`);
 
     return spaceInfo;
   } catch (error) {
@@ -83,57 +76,34 @@ async function getConfluenceSpaceInfo() {
   }
 }
 
-async function connectMCP() {
-  if (mcpClient) return mcpClient;
+async function connectAtlassian() {
+  if (atlassianClient) return atlassianClient;
 
   try {
-    const transport = new StdioClientTransport({
-      command: 'npx',
-      args: ['-y', 'mcp-remote', 'https://mcp.atlassian.com/v1/sse']
+    // Initialize REST API client with credentials from environment
+    atlassianClient = new AtlassianRestClient({
+      email: process.env.ATLASSIAN_EMAIL,
+      apiToken: process.env.ATLASSIAN_API_TOKEN,
+      domain: process.env.ATLASSIAN_DOMAIN,
+      jiraBaseUrl: process.env.JIRA_BASE_URL
     });
 
-    mcpClient = new Client({
-      name: 'atlassian-web-ui',
-      version: '1.0.0'
-    }, {
-      capabilities: {}
-    });
+    // Test connection
+    const connectionTest = await atlassianClient.testConnection();
+    if (!connectionTest.success) {
+      throw new Error(`Authentication failed: ${connectionTest.error}`);
+    }
 
-    await mcpClient.connect(transport);
-    
-    // Get resources with timeout
-    const resourcesPromise = mcpClient.callTool({
-      name: 'getAccessibleAtlassianResources',
-      arguments: {}
-    });
-    
-    const resources = await Promise.race([
-      resourcesPromise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout getting resources')), 5000))
-    ]);
-    
-    cloudId = JSON.parse(resources.content[0].text)[0].id;
-    
-    // Get project key with timeout
-    const projectsPromise = mcpClient.callTool({
-      name: 'getVisibleJiraProjects',
-      arguments: { cloudId: cloudId }
-    });
-    
-    const projects = await Promise.race([
-      projectsPromise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout getting projects')), 5000))
-    ]);
-    
-    const projectList = JSON.parse(projects.content[0].text);
-    projectKey = projectList.values[0].key;
-    
-    console.log('✅ Connected to Atlassian MCP');
+    console.log(`✅ Connected to Atlassian Cloud as ${connectionTest.user}`);
+
+    // Get project key
+    const projects = await atlassianClient.getProjects();
+    projectKey = process.env.DEFAULT_PROJECT_KEY || projects[0].key;
+
     console.log('✅ Using project:', projectKey);
-    console.log('✅ Cloud ID:', cloudId);
-    return mcpClient;
+    return atlassianClient;
   } catch (error) {
-    console.error('Failed to connect to MCP:', error.message);
+    console.error('Failed to connect to Atlassian:', error.message);
     throw error;
   }
 }
@@ -187,17 +157,12 @@ async function processQuery(query) {
       
       console.log(`   JQL: ${jql}`);
 
-      const searchResult = await mcpClient.callTool({
-        name: 'searchJiraIssuesUsingJql',
-        arguments: {
-          cloudId: cloudId,
-          jql: jql,
-          maxResults: 100,
-          fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'reporter', 'created', 'updated']
-        }
+      const searchResult = await atlassianClient.searchJiraIssues(jql, {
+        maxResults: 100,
+        fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'reporter', 'created', 'updated', 'labels']
       });
 
-      let issues = JSON.parse(searchResult.content[0].text).issues || [];
+      let issues = searchResult.issues || [];
       console.log(`   Found ${issues.length} issues for report`);
 
       // Apply client-side assignee filter if specified
@@ -221,21 +186,14 @@ async function processQuery(query) {
           // Get Confluence space info (cached after first call)
           const spaceInfo = await getConfluenceSpaceInfo();
 
-          console.log(`   📝 Creating page in space: ${spaceInfo.name} (${spaceInfo.key})`);
+          console.log(`   📄 Creating page in space: ${spaceInfo.name} (${spaceInfo.key})`);
 
           // Create the Confluence page using space key
-          const createResult = await mcpClient.callTool({
-            name: 'createConfluencePage',
-            arguments: {
-              cloudId: cloudId,
-              spaceKey: spaceInfo.key,  // Use space key instead of ID
-              title: report.title,
-              body: report.content,
-              bodyFormat: 'storage'
-            }
-          });
-
-          const createdPage = JSON.parse(createResult.content[0].text);
+          const createdPage = await atlassianClient.createConfluencePage(
+            spaceInfo.key,
+            report.title,
+            report.content
+          );
 
           // Check for errors in response
           if (createdPage.error) {
@@ -297,21 +255,81 @@ async function processQuery(query) {
     console.log(`   Intent: ${nlpResult.intent}`);
     console.log(`   Description: ${nlpResult.description}`);
     
+    // Handle PI Dashboard intent (MOVED HERE - AFTER nlpResult is defined)
+    if (nlpResult.intent === 'pi-dashboard') {
+      try {
+        // Get all PI-labeled issues
+        const searchResult = await atlassianClient.searchJiraIssues(
+          `project = ${projectKey} AND labels in (PI-24.4, PI-25.1, PI-25.4, PI-26.1)`,
+          {
+            maxResults: 100,
+            fields: ['summary', 'status', 'labels', 'issuetype', 'priority']
+          }
+        );
+
+        const issues = searchResult.issues || [];
+        console.log(`   PI Dashboard - Found ${issues.length} total issues`);
+        if (issues.length > 0) {
+          console.log('   First issue labels:', issues[0].fields.labels);
+        }
+
+        // Group issues by PI
+        const piGroups = {};
+        issues.forEach(issue => {
+          const piLabel = issue.fields.labels?.find(l => l.match(/^PI-\d+\.\d+$/));
+          if (piLabel) {
+            console.log(`   Found PI label: ${piLabel} in issue ${issue.key}`);
+          }
+          if (piLabel) {
+            if (!piGroups[piLabel]) {
+              piGroups[piLabel] = {
+                total: 0,
+                done: 0,
+                inProgress: 0,
+                todo: 0,
+                objectives: 0,
+                features: 0,
+                risks: 0
+              };
+            }
+            piGroups[piLabel].total++;
+            
+            // Count by status
+            const status = issue.fields.status.name;
+            if (status === 'Done') piGroups[piLabel].done++;
+            else if (status === 'In Progress') piGroups[piLabel].inProgress++;
+            else piGroups[piLabel].todo++;
+            
+            // Count by type
+            if (issue.fields.labels.includes('PI-Objective')) piGroups[piLabel].objectives++;
+            if (issue.fields.labels.includes('Feature')) piGroups[piLabel].features++;
+            if (issue.fields.labels.includes('Risk')) piGroups[piLabel].risks++;
+          }
+        });
+
+        console.log(`   PI Dashboard - Grouped into ${Object.keys(piGroups).length} PIs:`, Object.keys(piGroups));
+
+        return {
+          type: 'pi-dashboard',
+          data: piGroups,
+          message: 'Program Increment Dashboard'
+        };
+      } catch (error) {
+        return {
+          type: 'error',
+          message: `Could not generate PI dashboard: ${error.message}`
+        };
+      }
+    }
+    
     // Handle creation intent
     if (nlpResult.intent === 'create') {
       try {
-        const result = await mcpClient.callTool({
-          name: 'createJiraIssue',
-          arguments: {
-            cloudId: cloudId,
-            projectKey: projectKey,
-            issueType: nlpResult.type,
-            summary: nlpResult.title,
-            description: nlpResult.description || ''
-          }
+        const data = await atlassianClient.createJiraIssue(projectKey, {
+          issueType: nlpResult.type,
+          summary: nlpResult.title,
+          description: nlpResult.description || ''
         });
-        
-        const data = JSON.parse(result.content[0].text);
         return {
           type: 'created',
           data: data,
@@ -329,15 +347,7 @@ async function processQuery(query) {
     // Handle Confluence search
     if (nlpResult.intent === 'confluence') {
       try {
-        const result = await mcpClient.callTool({
-          name: 'searchConfluenceUsingCql',
-          arguments: {
-            cloudId: cloudId,
-            cql: nlpResult.cql,
-            limit: 25
-          }
-        });
-        const data = JSON.parse(result.content[0].text);
+        const data = await atlassianClient.searchConfluencePages(nlpResult.cql, { limit: 25 });
         return {
           type: 'confluence',
           data: data.results || [],
@@ -356,22 +366,16 @@ async function processQuery(query) {
     if (nlpResult.intent === 'summary') {
       try {
         console.log('   Fetching project summary...');
-        const searchPromise = mcpClient.callTool({
-          name: 'searchJiraIssuesUsingJql',
-          arguments: {
-            cloudId: cloudId,
-            jql: nlpResult.jql || `project = ${projectKey} ORDER BY created DESC`,
-            maxResults: 100
-          }
-        });
-        
+        const searchPromise = atlassianClient.searchJiraIssues(
+          nlpResult.jql || `project = ${projectKey} ORDER BY created DESC`,
+          { maxResults: 100 }
+        );
+
         // Add timeout for the search
-        const result = await Promise.race([
+        const data = await Promise.race([
           searchPromise,
           new Promise((_, reject) => setTimeout(() => reject(new Error('Search timeout')), 10000))
         ]);
-        
-        const data = JSON.parse(result.content[0].text);
         const issues = data.issues || [];
         const total = issues.length;
         
@@ -415,7 +419,6 @@ async function processQuery(query) {
     }
     
     // Handle search intent (default)
-    // Changed from 'let jql' to just 'jql' since it's already declared above
     let jql = nlpResult.jql || `project = ${projectKey}`;
     
     // Ensure project key is in the JQL if not already present
@@ -429,25 +432,18 @@ async function processQuery(query) {
     console.log(`🔍 Executing JQL: ${jql}`);
 
     try {
-      const searchPromise = mcpClient.callTool({
-        name: 'searchJiraIssuesUsingJql',
-        arguments: {
-          cloudId: cloudId,
-          jql: jql,
-          maxResults: 50,
-          fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'reporter', 'created', 'updated']
-        }
+      const searchPromise = atlassianClient.searchJiraIssues(jql, {
+        maxResults: 50,
+        fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'reporter', 'created', 'updated', 'labels']
       });
-      
+
       // Add 10 second timeout
-      const result = await Promise.race([
+      const data = await Promise.race([
         searchPromise,
         new Promise((_, reject) => setTimeout(() => reject(new Error('Search timeout')), 10000))
       ]);
-      
+
       console.log('   ✅ Search completed');
-      
-      const data = JSON.parse(result.content[0].text);
       
       // Check for errors
       if (data.error) {
@@ -556,20 +552,15 @@ const server = http.createServer(async (req, res) => {
   // Test endpoint
   if (req.url === '/api/test' && req.method === 'GET') {
     try {
-      console.log('Testing MCP connection...');
-      const result = await mcpClient.callTool({
-        name: 'searchJiraIssuesUsingJql',
-        arguments: {
-          cloudId: cloudId,
-          jql: `project = ${projectKey}`,
-          maxResults: 1
-        }
-      });
+      console.log('Testing Atlassian REST API connection...');
+      const result = await atlassianClient.searchJiraIssues(
+        `project = ${projectKey}`,
+        { maxResults: 1 }
+      );
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        success: true, 
-        message: 'MCP connection working',
-        cloudId: cloudId,
+      res.end(JSON.stringify({
+        success: true,
+        message: 'REST API connection working',
         projectKey: projectKey
       }));
     } catch (error) {
@@ -579,6 +570,43 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
+  // Direct API test endpoint - demonstrates REST API approach
+  if (req.url === '/api/direct-test' && req.method === 'GET') {
+    try {
+      // Use credentials from .env file
+      const API_TOKEN = `${process.env.ATLASSIAN_EMAIL}:${process.env.ATLASSIAN_API_TOKEN}`;
+      const encoded = Buffer.from(API_TOKEN).toString('base64');
+
+      const response = await fetch(
+        `https://${process.env.ATLASSIAN_DOMAIN}/rest/api/3/search?jql=project=${projectKey}`,
+        {
+          headers: {
+            'Authorization': `Basic ${encoded}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        message: 'Direct REST API works! This simulates on-prem approach.',
+        issueCount: data.issues?.length || 0,
+        issues: data.issues?.slice(0, 3).map(i => ({
+          key: i.key,
+          summary: i.fields.summary,
+          status: i.fields.status.name
+        }))
+      }));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message }));
+    }
+    return;
+  }
+
   // API endpoint
   if (req.url === '/api/query' && req.method === 'POST') {
     let body = '';
@@ -589,11 +617,11 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { query } = JSON.parse(body);
-        
-        if (!mcpClient) {
-          await connectMCP();
+
+        if (!atlassianClient) {
+          await connectAtlassian();
         }
-        
+
         const result = await processQuery(query);
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -621,31 +649,28 @@ const HOST = '0.0.0.0';
 server.listen(PORT, HOST, async () => {
   console.log('\n🚀 Atlassian AI Assistant - Web UI');
   console.log('================================\n');
-  console.log('Starting MCP connection...');
-  
+  console.log('Starting Atlassian REST API connection...');
+
   try {
-    await connectMCP();
+    await connectAtlassian();
     console.log(`\n✅ Server running at http://localhost:${PORT}`);
     console.log(`✅ Also accessible at http://10.100.102.110:${PORT}`);
     console.log('\n📱 Open in your browser to start chatting!\n');
-    
+
     // Test the connection
     console.log('Testing connection...');
-    const testResult = await mcpClient.callTool({
-      name: 'searchJiraIssuesUsingJql',
-      arguments: {
-        cloudId: cloudId,
-        jql: `project = ${projectKey}`,
-        maxResults: 1
-      }
-    });
-    const testData = JSON.parse(testResult.content[0].text);
+    const testData = await atlassianClient.searchJiraIssues(
+      `project = ${projectKey}`,
+      { maxResults: 1 }
+    );
     console.log(`✅ Connection test successful - Found ${testData.issues?.length || 0} issues\n`);
-    
+
   } catch (error) {
     console.error('\n❌ Failed to start:', error.message);
-    console.log('\nMake sure mcp-remote is running in another terminal:');
-    console.log('  npx -y mcp-remote https://mcp.atlassian.com/v1/sse\n');
+    console.log('\nMake sure your .env file has the correct credentials:');
+    console.log('  ATLASSIAN_EMAIL=your-email@example.com');
+    console.log('  ATLASSIAN_API_TOKEN=your-api-token');
+    console.log('  ATLASSIAN_DOMAIN=your-domain.atlassian.net\n');
     process.exit(1);
   }
 });

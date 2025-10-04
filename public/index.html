@@ -393,14 +393,16 @@
                 { icon: '🚨', text: 'נושאים בעדיפות גבוהה', query: 'הצג נושאים בעדיפות גבוהה' },
                 { icon: '📊', text: 'סיכום פרויקט', query: 'תן לי סיכום פרויקט' },
                 { icon: '📋', text: 'דוח ספרינט', query: 'צור דוח ספרינט' },
-                { icon: '👤', text: 'משימות שלי', query: 'הצג משימות משויכות לי' },
-                { icon: '🔮', text: 'ספרינטים עתידיים', query: 'הצג משימות בספרינטים עתידיים' }
+                { icon: '🎯', text: 'PI 26.1', query: 'Show PI 26.1' },
+                { icon: '⚠️', text: 'סיכוני PI', query: 'Show PI 26.1 risks' },
+                { icon: '👤', text: 'משימות שלי', query: 'הצג משימות משויכות לי' }
             ],
             help: [
                 { icon: '🔍', text: 'חיפוש נושאים', query: 'חפש נושאים בסטטוס In Progress' },
                 { icon: '📅', text: 'שאילתות ספרינט', query: 'הצג נושאים בספרינט 2' },
+                { icon: '🎯', text: 'PI Planning', query: 'Show PI 26.1' },
+                { icon: '📊', text: 'דוח PI', query: 'Generate PI 26.1 report' },
                 { icon: '👥', text: 'משימות לפי משתמש', query: 'הצג משימות משויכות ל-Kof Adam' },
-                { icon: '📊', text: 'דוחות', query: 'צור דוח באגים' },
                 { icon: '🔮', text: 'ספרינטים עתידיים', query: 'הצג משימות בביצוע בספרינטים עתידיים' },
                 { icon: '📚', text: 'Confluence', query: 'הצג דפי Confluence' },
                 { icon: '🎯', text: 'עוד דוגמאות', query: 'הצג דוגמאות נוספות' }
@@ -420,6 +422,13 @@
                 { icon: '🐛', text: 'הצג באגים', query: 'הצג את כל הבאגים' },
                 { icon: '📋', text: 'דוח ספרינט', query: 'צור דוח ספרינט' },
                 { icon: '🔍', text: 'חפש נושאים', query: 'חפש נושאים' }
+            ],
+            afterPI: [
+                { icon: '📊', text: 'דוח PI', query: 'Generate PI 26.1 report' },
+                { icon: '🎯', text: 'יעדי PI', query: 'Show PI 26.1 objectives' },
+                { icon: '⚠️', text: 'סיכונים', query: 'Show PI 26.1 risks' },
+                { icon: '🚀', text: 'פיצ\'רים', query: 'Show PI 26.1 features' },
+                { icon: '📈', text: 'PI קודם', query: 'Show PI 25.4' }
             ]
         };
 
@@ -600,6 +609,51 @@
                     }
                 }
                 
+                // Handle PI Dashboard
+                if (data && data.type === 'pi-dashboard') {
+                const dashboardDiv = document.createElement('div');
+                dashboardDiv.style.cssText = 'background: white; padding: 20px; margin-top: 15px; border-radius: 12px; border: 1px solid #dfe1e6;';
+                
+                let dashboardHTML = '<h3 style="color: #0052cc; margin-bottom: 20px;">📊 Program Increment Dashboard</h3>';
+                
+                if (Object.keys(data.data).length === 0) {
+                    dashboardHTML += '<p>No PI-labeled issues found. Add labels like PI-25.4, PI-26.1 to your issues.</p>';
+                } else {
+                    Object.entries(data.data).sort().forEach(([pi, stats]) => {
+                    const completionRate = Math.round((stats.done / stats.total) * 100) || 0;
+                    dashboardHTML += `
+                        <div style="margin-bottom: 20px; padding: 15px; background: #f7f8f9; border-radius: 8px;">
+                        <h4 style="color: #172b4d; margin-bottom: 10px;">${pi}</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 10px;">
+                            <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #0052cc;">${stats.total}</div>
+                            <div style="font-size: 0.9em; color: #5e6c84;">Total Items</div>
+                            </div>
+                            <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #00875a;">${completionRate}%</div>
+                            <div style="font-size: 0.9em; color: #5e6c84;">Complete</div>
+                            </div>
+                            <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #ff5630;">${stats.objectives}</div>
+                            <div style="font-size: 0.9em; color: #5e6c84;">Objectives</div>
+                            </div>
+                            <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #6554c0;">${stats.features}</div>
+                            <div style="font-size: 0.9em; color: #5e6c84;">Features</div>
+                            </div>
+                        </div>
+                        <div style="background: #dfe1e6; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div style="background: #00875a; height: 100%; width: ${completionRate}%; transition: width 0.3s;"></div>
+                        </div>
+                        </div>
+                    `;
+                    });
+                }
+                
+                dashboardDiv.innerHTML = dashboardHTML;
+                bubble.appendChild(dashboardDiv);
+                }
+
                 // Handle Confluence pages
                 if (data.type === 'confluence') {
                     const grid = document.createElement('div');
@@ -643,7 +697,7 @@
 
                         grid.appendChild(card);
                     });
-
+                
                     bubble.appendChild(grid);
                 }
             }
@@ -704,8 +758,19 @@
   <li>צור דוח ספרינט 1</li>
   <li>צור דוח באגים</li>
   <li>צור דוח סטטוס</li>
+  <li>Generate PI 26.1 report</li>
   <li>צור דוח של משימות בספרינטים עתידיים</li>
   <li>צור דוח באגים ופרסם ל-Confluence</li>
+</ul>
+
+<h4>🎯 SAFe Program Increment (PI):</h4>
+<ul>
+  <li>Show PI 26.1 objectives</li>
+  <li>Show PI 26.1 features</li>
+  <li>Show PI 26.1 risks</li>
+  <li>Show owned risks</li>
+  <li>Show mitigated risks</li>
+  <li>Show current PI</li>
 </ul>
 
 <h4>📚 Confluence:</h4>
@@ -747,6 +812,8 @@
                 // Update suggestions based on query context
                 if (lowerQuery.includes('באג') || lowerQuery.includes('bug')) {
                     updateSuggestions('afterBugs');
+                } else if (lowerQuery.includes('pi') || lowerQuery.includes('program increment') || lowerQuery.includes('roam') || lowerQuery.includes('סיכונים')) {
+                    updateSuggestions('afterPI');
                 } else if (lowerQuery.includes('ספרינט') || lowerQuery.includes('sprint')) {
                     updateSuggestions('afterSprint');
                 } else if (lowerQuery.includes('סיכום') || lowerQuery.includes('summary')) {

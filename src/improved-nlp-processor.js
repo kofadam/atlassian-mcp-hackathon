@@ -221,8 +221,68 @@ export function processNaturalLanguage(query) {
     mobile: {
       en: /(?:mobile|app|ios|android|react native)/i,
       he: /(?:מובייל|אפליקציה|יישומון)/
+    },
+
+    // PI (Program Increment) patterns
+    piObjectives: {
+      en: /(?:(?:show|list|get|display|what are)(?: me)?(?: all)?(?: the)? )?PI[- ]?(\d+)\.(\d+)\s*(?:objectives?|goals?)/i,
+      he: /(?:הצג|הראה|מה|תן לי)(?: את)? (?:יעדי|מטרות) PI\s*(\d+)\.(\d+)/
+    },
+
+    piRisks: {
+      en: /(?:show|list|get|display|what are)(?: me)?(?: all)?(?: the)? (?:PI|program increment)[- ]?(\d+)\.(\d+)\s*(?:risks?|roam)/i,
+      he: /(?:הצג|הראה|מה|תן לי)(?: את)? (?:סיכונים|ריסקים) PI\s*(\d+)\.(\d+)/
+    },
+
+    piFeatures: {
+      en: /(?:show|list|get|display|what are)(?: me)?(?: all)?(?: the)? (?:PI|program increment)[- ]?(\d+)\.(\d+)\s*(?:features?|capabilities?)/i,
+      he: /(?:הצג|הראה|מה|תן לי)(?: את)? (?:פיצ'רים|תכונות) PI\s*(\d+)\.(\d+)/
+    },
+
+    piGeneral: {
+      en: /(?:show|display|what is|tell me about|info about)(?: me)?(?: the)? (?:PI|program increment)[- ]?(\d+)\.(\d+)/i,
+      he: /(?:הצג|הראה|מה|ספר לי)(?: על)? PI\s*(\d+)\.(\d+)/
+    },
+
+    piCurrent: {
+      en: /(?:current|active|latest) (?:PI|program increment)/i,
+      he: /PI (?:נוכחי|פעיל|הנוכחי)/
+    },
+
+    piROAM: {
+      en: /(?:roam|resolved|owned|accepted|mitigated) (?:risks?|items?)/i,
+      he: /(?:סיכונים|ריסקים) (?:פתורים|בבעלות|מקובלים|ממותנים)/
     }
   };
+
+  // Simple PI pattern fallback - matches just "PI X.Y" or "PI X.Y something"
+  const simplePIMatch = lowerQuery.match(/pi[- ]?(\d+)\.(\d+)(?:\s+(.+))?/i);
+  if (simplePIMatch) {
+    const piVersion = `${simplePIMatch[1]}.${simplePIMatch[2]}`;
+    const suffix = simplePIMatch[3] || '';
+    
+    let jql = `project = KMD AND labels = "PI-${piVersion}"`;
+    let description = `PI ${piVersion}`;
+    
+    if (suffix.includes('objective')) {
+      jql += ' AND labels = "PI-Objective"';
+      description += ' objectives';
+    } else if (suffix.includes('risk')) {
+      jql += ' AND labels = "Risk"';
+      description += ' risks';
+    } else if (suffix.includes('feature')) {
+      jql += ' AND labels = "Feature"';
+      description += ' features';
+    } else {
+      description = `All PI ${piVersion} items`;
+    }
+    
+    return {
+      intent: 'search',
+      jql: jql,
+      description: description
+    };
+  }
 
   // Check for creation intent
   if (patterns.createIssue.en.test(lowerQuery)) {
@@ -234,6 +294,108 @@ export function processNaturalLanguage(query) {
       type: issueType.charAt(0).toUpperCase() + issueType.slice(1),
       title: title,
       jql: null
+    };
+  }
+
+  // *** CHECK FOR PI (Program Increment) PATTERNS ***
+  // PI Objectives
+  let piMatch = lowerQuery.match(patterns.piObjectives.en);
+  if (piMatch) {
+    const piVersion = `${piMatch[1]}.${piMatch[2]}`;
+    return {
+      intent: 'search',
+      jql: `project = KMD AND labels = "PI-${piVersion}" AND labels = "PI-Objective"`,
+      description: `PI ${piVersion} objectives`,
+      piVersion: piVersion,
+      piType: 'objectives'
+    };
+  }
+
+  // PI Risks
+  piMatch = lowerQuery.match(patterns.piRisks.en);
+  if (piMatch) {
+    const piVersion = `${piMatch[1]}.${piMatch[2]}`;
+    return {
+      intent: 'search',
+      jql: `project = KMD AND labels = "PI-${piVersion}" AND labels = "Risk"`,
+      description: `PI ${piVersion} risks`,
+      piVersion: piVersion,
+      piType: 'risks'
+    };
+  }
+
+  // PI Features
+  piMatch = lowerQuery.match(patterns.piFeatures.en);
+  if (piMatch) {
+    const piVersion = `${piMatch[1]}.${piMatch[2]}`;
+    return {
+      intent: 'search',
+      jql: `project = KMD AND labels = "PI-${piVersion}" AND labels = "Feature"`,
+      description: `PI ${piVersion} features`,
+      piVersion: piVersion,
+      piType: 'features'
+    };
+  }
+
+  // PI General (all PI items)
+  piMatch = lowerQuery.match(patterns.piGeneral.en);
+  if (piMatch) {
+    const piVersion = `${piMatch[1]}.${piMatch[2]}`;
+    return {
+      intent: 'search',
+      jql: `project = KMD AND labels = "PI-${piVersion}"`,
+      description: `All PI ${piVersion} items`,
+      piVersion: piVersion,
+      piType: 'all'
+    };
+  }
+
+  // Current PI
+  if (patterns.piCurrent.en.test(lowerQuery) || patterns.piCurrent.he.test(query)) {
+    return {
+      intent: 'search',
+      jql: 'project = KMD AND labels = "PI-25.1"',
+      description: 'Current PI (25.1) items',
+      piVersion: '25.1',
+      piType: 'all'
+    };
+  }
+
+  // Generic PI query - "show PI" without specific number
+  if (lowerQuery.match(/^(?:show|what['']?s|current|display)\s*(?:the\s*)?pi\s*$|^pi\s*$|^pi dashboard|^pi status/i)) {
+    return {
+      intent: 'pi-dashboard',
+      description: 'Program Increment Dashboard'
+    };
+  }
+  
+  // ROAM Risks
+  if (patterns.piROAM.en.test(lowerQuery) || patterns.piROAM.he.test(query)) {
+    let roamStatus = null;
+    if (lowerQuery.includes('resolved') || query.includes('פתור')) {
+      roamStatus = 'ROAM-Resolved';
+    } else if (lowerQuery.includes('owned') || query.includes('בבעלות')) {
+      roamStatus = 'ROAM-Owned';
+    } else if (lowerQuery.includes('accepted') || query.includes('מקובל')) {
+      roamStatus = 'ROAM-Accepted';
+    } else if (lowerQuery.includes('mitigated') || query.includes('ממותן')) {
+      roamStatus = 'ROAM-Mitigated';
+    }
+
+    let jql = 'project = KMD AND labels = "Risk"';
+    let description = 'All PI risks';
+
+    if (roamStatus) {
+      jql += ` AND labels = "${roamStatus}"`;
+      description = `${roamStatus.replace('ROAM-', '')} risks`;
+    }
+
+    return {
+      intent: 'search',
+      jql: jql,
+      description: description,
+      piType: 'risks',
+      roamStatus: roamStatus
     };
   }
 
@@ -473,14 +635,14 @@ export function processNaturalLanguage(query) {
       const personName = nameMatch[1];
 
       // Check if query also mentions sprint
-      const sprintMatch = query.match(/(?:sprint|ספרינט)\s+(\d+)/i);
+      const sprintMatch = query.match(/(?:sprint|ספרינט)\s+([\d.]+)/i);
 
       let jql = 'project = KMD AND assignee is not EMPTY';
       let description = `נושאים משויכים ל-${personName}`;
 
       if (sprintMatch) {
         const sprintNum = sprintMatch[1];
-        jql += ` AND sprint = "Sprint ${sprintNum}"`;
+        jql += ` AND labels = "Sprint-${sprintNum}"`;
         description += ` בספרינט ${sprintNum}`;
       }
 
@@ -581,13 +743,14 @@ export function processNaturalLanguage(query) {
     };
   }
 
-  // For specific sprint numbers
-  const sprintNumberMatch = lowerQuery.match(/sprint\s*(\d+)/i);
+  // For specific sprint numbers (supports formats like "25", "25.4", "25.4.2")
+  const sprintNumberMatch = lowerQuery.match(/sprint\s*([\d.]+)/i);
   if (sprintNumberMatch) {
     const sprintNumber = sprintNumberMatch[1];
+    // Search in labels using hyphenated format (no spaces allowed in Jira labels)
     return {
-      intent: 'search', 
-      jql: `project = KMD AND sprint = "Sprint ${sprintNumber}"`,
+      intent: 'search',
+      jql: `project = KMD AND labels = "Sprint-${sprintNumber}"`,
       description: `Issues in Sprint ${sprintNumber}`
     };
   }

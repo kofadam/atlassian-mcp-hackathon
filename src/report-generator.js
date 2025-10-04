@@ -14,6 +14,8 @@ export function generateReport(issues, reportType) {
       return generateBugReport(issues, now);
     case 'status':
       return generateStatusReport(issues, now);
+    case 'pi':
+      return generatePIReport(issues, now);
     default:
       return generateGenericReport(issues, now);
   }
@@ -297,11 +299,213 @@ function generateGenericReport(issues, date) {
   return generateStatusReport(issues, date);
 }
 
+function generatePIReport(issues, date) {
+  // Extract PI version from labels
+  const piLabel = issues.find(i => i.fields.labels?.some(l => l.startsWith('PI-')))
+    ?.fields.labels?.find(l => l.startsWith('PI-'));
+  const piVersion = piLabel ? piLabel.replace('PI-', '') : 'Unknown';
+
+  // Categorize issues by type
+  const objectives = issues.filter(i => i.fields.labels?.includes('PI-Objective'));
+  const features = issues.filter(i => i.fields.labels?.includes('Feature'));
+  const risks = issues.filter(i => i.fields.labels?.includes('Risk'));
+
+  // Group risks by ROAM status
+  const risksByROAM = {
+    'Resolved': risks.filter(r => r.fields.labels?.includes('ROAM-Resolved')),
+    'Owned': risks.filter(r => r.fields.labels?.includes('ROAM-Owned')),
+    'Accepted': risks.filter(r => r.fields.labels?.includes('ROAM-Accepted')),
+    'Mitigated': risks.filter(r => r.fields.labels?.includes('ROAM-Mitigated'))
+  };
+
+  // Calculate feature story points total
+  const totalStoryPoints = features.reduce((sum, f) => {
+    const description = f.fields.description || '';
+    const spMatch = description.match(/\*\*Story Points:\*\*\s*(\d+)/);
+    return sum + (spMatch ? parseInt(spMatch[1]) : 0);
+  }, 0);
+
+  let html = `
+<h1>Program Increment ${piVersion} Report</h1>
+<p><em>Generated on ${date}</em></p>
+
+<h2>Executive Summary</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>Count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PI Objectives</td>
+      <td><strong>${objectives.length}</strong></td>
+    </tr>
+    <tr>
+      <td>Features/Capabilities</td>
+      <td><strong>${features.length}</strong></td>
+    </tr>
+    <tr>
+      <td>Total Story Points</td>
+      <td><strong>${totalStoryPoints}</strong></td>
+    </tr>
+    <tr>
+      <td>Identified Risks</td>
+      <td><strong>${risks.length}</strong></td>
+    </tr>
+    <tr>
+      <td>Resolved Risks</td>
+      <td><strong>${risksByROAM.Resolved.length}</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>PI Objectives</h2>
+${objectives.length > 0 ? `
+<table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Objective</th>
+      <th>Business Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${objectives.map(obj => {
+      const description = obj.fields.description || '';
+      const bvMatch = description.match(/\*\*Business Value:\*\*\s*(\d+)\/10/);
+      const businessValue = bvMatch ? bvMatch[1] : 'N/A';
+      return `
+    <tr>
+      <td><a href="https://kofadam.atlassian.net/browse/${obj.key}">${obj.key}</a></td>
+      <td>${obj.fields.summary.replace(/^PI \d+\.\d+ Objective:\s*/, '')}</td>
+      <td>${businessValue}/10</td>
+    </tr>`;
+    }).join('')}
+  </tbody>
+</table>
+` : '<p><em>No objectives defined for this PI</em></p>'}
+
+<h2>Features & Capabilities</h2>
+${features.length > 0 ? `
+<table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Feature</th>
+      <th>Story Points</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${features.map(feature => {
+      const description = feature.fields.description || '';
+      const spMatch = description.match(/\*\*Story Points:\*\*\s*(\d+)/);
+      const storyPoints = spMatch ? spMatch[1] : '-';
+      return `
+    <tr>
+      <td><a href="https://kofadam.atlassian.net/browse/${feature.key}">${feature.key}</a></td>
+      <td>${feature.fields.summary.replace(/^Feature:\s*/, '')}</td>
+      <td>${storyPoints}</td>
+      <td>${feature.fields.status.name}</td>
+    </tr>`;
+    }).join('')}
+  </tbody>
+</table>
+<p><strong>Total Planned Story Points:</strong> ${totalStoryPoints}</p>
+` : '<p><em>No features defined for this PI</em></p>'}
+
+<h2>Risks & ROAM Status</h2>
+${risks.length > 0 ? `
+<div>
+${Object.entries(risksByROAM).map(([status, riskList]) => {
+  if (riskList.length === 0) return '';
+  const statusColor = {
+    'Resolved': '#e3fcef',
+    'Owned': '#fff4e6',
+    'Accepted': '#fff0f0',
+    'Mitigated': '#f0f5ff'
+  }[status];
+  const statusIcon = {
+    'Resolved': '✅',
+    'Owned': '👤',
+    'Accepted': '⚠️',
+    'Mitigated': '🛡️'
+  }[status];
+
+  return `
+<h3>${statusIcon} ${status} Risks (${riskList.length})</h3>
+<table style="background-color: ${statusColor}">
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Risk Description</th>
+      <th>Priority</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${riskList.map(risk => `
+    <tr>
+      <td><a href="https://kofadam.atlassian.net/browse/${risk.key}">${risk.key}</a></td>
+      <td>${risk.fields.summary.replace(/^Risk:\s*/, '')}</td>
+      <td>${risk.fields.priority?.name || 'Medium'}</td>
+    </tr>`).join('')}
+  </tbody>
+</table>
+`;
+}).join('')}
+</div>
+
+<h3>ROAM Distribution</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Count</th>
+      <th>Percentage</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${Object.entries(risksByROAM).map(([status, riskList]) => `
+    <tr>
+      <td>${status}</td>
+      <td>${riskList.length}</td>
+      <td>${Math.round((riskList.length / risks.length) * 100)}%</td>
+    </tr>`).join('')}
+  </tbody>
+</table>
+` : '<p><em>No risks identified for this PI</em></p>'}
+
+<h2>Recommendations</h2>
+<ul>
+  ${risksByROAM.Owned.length > 0 ? `<li>⚠️ <strong>${risksByROAM.Owned.length} risks are Owned</strong> - ensure mitigation plans are in place</li>` : ''}
+  ${risksByROAM.Accepted.length > 0 ? `<li>⚠️ <strong>${risksByROAM.Accepted.length} risks are Accepted</strong> - monitor closely for impact</li>` : ''}
+  ${totalStoryPoints > 0 ? `<li>📊 Total planned capacity: <strong>${totalStoryPoints} story points</strong></li>` : ''}
+  ${risksByROAM.Resolved.length === risks.length && risks.length > 0 ? '<li>✅ All risks have been resolved - excellent risk management!</li>' : ''}
+</ul>
+
+<hr/>
+<p><em>Generated by Atlassian AI Assistant on ${date}</em></p>
+`;
+
+  return {
+    title: `PI ${piVersion} Report - ${date}`,
+    content: html,
+    format: 'storage'
+  };
+}
+
 // Add this function to handle report generation requests in your NLP processor
 export function detectReportIntent(query) {
   const lowerQuery = query.toLowerCase();
 
   const reportPatterns = [
+    // PI report patterns (check first for specificity)
+    { pattern: /(?:create|generate|make|show)(?:\s+a)?\s+(?:PI|program increment)\s+(\d+\.\d+)\s+report/i, type: 'pi' },
+    { pattern: /(?:create|generate|make)(?:\s+a)?\s+report\s+(?:of|for)\s+(?:PI|program increment)\s+(\d+\.\d+)/i, type: 'pi' },
+    { pattern: /(?:ייצר|צור|תייצר|תן לי|הכן)(?:\s+לי)?(?:\s+את)?\s+דוח\s+PI\s+(\d+\.\d+)/i, type: 'pi' },
+
     // English patterns
     { pattern: /(?:create|generate|make)(?:\s+a)?\s+report\s+(?:of|for)\s+(?:all\s+)?(?:future|upcoming)\s+sprints?\s+(?:in progress\s+)?tasks?/i, type: 'future-sprints' },
     { pattern: /generate (?:a )?(?:sprint \d+ |sprint )?report/i, type: 'sprint' },
