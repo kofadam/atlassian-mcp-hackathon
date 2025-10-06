@@ -1,6 +1,8 @@
 // report-generator.js - PI Report Generation Module
 // Place this file in src/report-generator.js
 
+import { searchJiraIssuesUsingJql } from './ollama-integration.js';
+
 /**
  * Generate a comprehensive PI report
  * @param {Object} mcpClient - MCP client instance
@@ -13,22 +15,9 @@ export async function generatePIReport(mcpClient, piLabel, piName, projectKey = 
   console.log(`📊 Generating report for ${piName} (${piLabel})`);
   
   try {
-    // Fetch all issues for this PI using MCP client directly
+    // Fetch all issues for this PI
     const jql = `project = ${projectKey} AND labels = "${piLabel}" ORDER BY priority DESC, type DESC`;
-    
-    const result = await mcpClient.callTool({
-      name: 'searchJiraIssuesUsingJql',
-      arguments: {
-        cloudId: '252a1017-b96e-41fc-8035-a3c27ec05bb5', // Your CloudID
-        jql: jql,
-        fields: ['summary', 'status', 'issuetype', 'priority', 'assignee', 'created', 'labels', 'duedate', 'reporter', 'description'],
-        maxResults: 100
-      }
-    });
-    
-    // Parse the result
-    const data = JSON.parse(result.content[0].text);
-    const issues = data.issues || [];
+    const issues = await searchJiraIssuesUsingJql(mcpClient, jql);
     
     // Process and categorize issues
     const reportData = processIssuesForReport(issues, piLabel, piName, projectKey);
@@ -70,10 +59,10 @@ function processIssuesForReport(issues, piLabel, piName, projectKey) {
   const report = {
     metadata: {
       piLabel,
-      piName: piName.replace('Current PI', 'PI נוכחי').replace('Next PI', 'PI הבא'),
+      piName,
       projectKey,
       generatedAt: now.toISOString(),
-      generatedAtFormatted: now.toLocaleString('he-IL'),
+      generatedAtFormatted: now.toLocaleString(),
       totalIssues: issues.length
     },
     statistics: {
@@ -265,11 +254,11 @@ function generateHTMLReport(reportData) {
   
   return `
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>דוח PI - ${metadata.piName}</title>
+  <title>PI Report - ${metadata.piName}</title>
   <style>
     * {
       margin: 0;
@@ -514,42 +503,42 @@ function generateHTMLReport(reportData) {
   <div class="container">
     <!-- Header -->
     <div class="header">
-      <h1>📊 דוח ${metadata.piName}</h1>
+      <h1>📊 ${metadata.piName} Report</h1>
       <div class="metadata">
-        <strong>פרויקט:</strong> ${metadata.projectKey} | 
+        <strong>Project:</strong> ${metadata.projectKey} | 
         <strong>PI:</strong> ${metadata.piLabel} | 
-        <strong>נוצר:</strong> ${metadata.generatedAtFormatted} | 
-        <strong>סה"כ נושאים:</strong> ${metadata.totalIssues}
+        <strong>Generated:</strong> ${metadata.generatedAtFormatted} | 
+        <strong>Total Issues:</strong> ${metadata.totalIssues}
       </div>
     </div>
     
     <!-- Executive Summary -->
     <div class="section">
-      <h2>סיכום מנהלים</h2>
+      <h2>Executive Summary</h2>
       
       <!-- Progress Bar -->
       <div class="progress-bar">
         <div class="progress-fill" style="width: ${metadata.completionPercentage}%">
-          ${metadata.completionPercentage}% הושלם
+          ${metadata.completionPercentage}% Complete
         </div>
       </div>
       
       <!-- Statistics Grid -->
       <div class="summary-grid">
         <div class="stat-card">
-          <h3>סה"כ נושאים</h3>
+          <h3>Total Issues</h3>
           <div class="value">${metadata.totalIssues}</div>
         </div>
         <div class="stat-card">
-          <h3>הושלמו</h3>
+          <h3>Completed</h3>
           <div class="value">${timeline.done.length}</div>
         </div>
         <div class="stat-card">
-          <h3>בביצוע</h3>
+          <h3>In Progress</h3>
           <div class="value">${timeline.inProgress.length}</div>
         </div>
         <div class="stat-card">
-          <h3>ממתינים</h3>
+          <h3>To Do</h3>
           <div class="value">${timeline.upcoming.length}</div>
         </div>
       </div>
@@ -557,11 +546,11 @@ function generateHTMLReport(reportData) {
     
     <!-- Highlights -->
     <div class="section">
-      <h2>נקודות מרכזיות</h2>
+      <h2>Key Highlights</h2>
       <div class="highlights-grid">
         ${highlights.highPriority.length > 0 ? `
         <div class="highlight-card critical">
-          <h3>🔴 עדיפות גבוהה (${highlights.highPriority.length})</h3>
+          <h3>🔴 High Priority (${highlights.highPriority.length})</h3>
           <ul>
             ${highlights.highPriority.slice(0, 3).map(issue => 
               `<li><span class="issue-key">${issue.key}</span>: ${issue.summary}</li>`
@@ -571,7 +560,7 @@ function generateHTMLReport(reportData) {
         
         ${highlights.blocked.length > 0 ? `
         <div class="highlight-card warning">
-          <h3>⚠️ חסומים (${highlights.blocked.length})</h3>
+          <h3>⚠️ Blocked (${highlights.blocked.length})</h3>
           <ul>
             ${highlights.blocked.slice(0, 3).map(issue => 
               `<li><span class="issue-key">${issue.key}</span>: ${issue.summary}</li>`
@@ -581,7 +570,7 @@ function generateHTMLReport(reportData) {
         
         ${highlights.completed.length > 0 ? `
         <div class="highlight-card success">
-          <h3>✅ הושלמו לאחרונה (${highlights.completed.length})</h3>
+          <h3>✅ Recently Completed (${highlights.completed.length})</h3>
           <ul>
             ${highlights.completed.slice(0, 3).map(issue => 
               `<li><span class="issue-key">${issue.key}</span>: ${issue.summary}</li>`
@@ -593,7 +582,7 @@ function generateHTMLReport(reportData) {
     
     <!-- Issues by Type -->
     <div class="section">
-      <h2>נושאים לפי סוג</h2>
+      <h2>Issues by Type</h2>
       <div class="chart-container">
         <div class="summary-grid">
           ${Object.entries(statistics.byType).map(([type, count]) => `
@@ -608,15 +597,15 @@ function generateHTMLReport(reportData) {
     <!-- Detailed Issue Lists -->
     ${issues.bugs.length > 0 ? `
     <div class="section">
-      <h2>🐛 באגים (${issues.bugs.length})</h2>
+      <h2>🐛 Bugs (${issues.bugs.length})</h2>
       <table class="issue-table">
         <thead>
           <tr>
-            <th>מזהה</th>
-            <th>תיאור</th>
-            <th>עדיפות</th>
-            <th>סטטוס</th>
-            <th>אחראי</th>
+            <th>Key</th>
+            <th>Summary</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Assignee</th>
           </tr>
         </thead>
         <tbody>
@@ -634,15 +623,15 @@ function generateHTMLReport(reportData) {
     
     ${issues.stories.length > 0 ? `
     <div class="section">
-      <h2>📖 סטוריז (${issues.stories.length})</h2>
+      <h2>📖 User Stories (${issues.stories.length})</h2>
       <table class="issue-table">
         <thead>
           <tr>
-            <th>מזהה</th>
-            <th>תיאור</th>
-            <th>נקודות</th>
-            <th>סטטוס</th>
-            <th>אחראי</th>
+            <th>Key</th>
+            <th>Summary</th>
+            <th>Story Points</th>
+            <th>Status</th>
+            <th>Assignee</th>
           </tr>
         </thead>
         <tbody>
@@ -660,12 +649,12 @@ function generateHTMLReport(reportData) {
     
     <!-- Team Distribution -->
     <div class="section">
-      <h2>חלוקה לפי צוות</h2>
+      <h2>Team Distribution</h2>
       <table class="issue-table">
         <thead>
           <tr>
-            <th>חבר צוות</th>
-            <th>נושאים משויכים</th>
+            <th>Team Member</th>
+            <th>Assigned Issues</th>
           </tr>
         </thead>
         <tbody>
@@ -682,7 +671,7 @@ function generateHTMLReport(reportData) {
     
     <!-- Footer -->
     <div class="footer">
-      נוצר על ידי Atlassian Intelligence Platform | ${metadata.generatedAtFormatted}
+      Generated by Atlassian Intelligence Platform | ${metadata.generatedAtFormatted}
     </div>
   </div>
 </body>
@@ -697,81 +686,81 @@ function generateMarkdownReport(reportData) {
   const { metadata, statistics, issues, highlights, timeline } = reportData;
   
   return `
-# דוח ${metadata.piName}
+# ${metadata.piName} Report
 
-**פרויקט:** ${metadata.projectKey}  
+**Project:** ${metadata.projectKey}  
 **PI:** ${metadata.piLabel}  
-**נוצר:** ${metadata.generatedAtFormatted}  
-**סה"כ נושאים:** ${metadata.totalIssues}
+**Generated:** ${metadata.generatedAtFormatted}  
+**Total Issues:** ${metadata.totalIssues}
 
 ---
 
-## סיכום מנהלים
+## Executive Summary
 
-**אחוז השלמה:** ${metadata.completionPercentage}%
+**Completion:** ${metadata.completionPercentage}%
 
-- **סה"כ נושאים:** ${metadata.totalIssues}
-- **הושלמו:** ${timeline.done.length}
-- **בביצוע:** ${timeline.inProgress.length}
-- **ממתינים:** ${timeline.upcoming.length}
+- **Total Issues:** ${metadata.totalIssues}
+- **Completed:** ${timeline.done.length}
+- **In Progress:** ${timeline.inProgress.length}
+- **To Do:** ${timeline.upcoming.length}
 
-## נקודות מרכזיות
+## Key Highlights
 
-${highlights.highPriority.length > 0 ? `### 🔴 נושאים בעדיפות גבוהה (${highlights.highPriority.length})
+${highlights.highPriority.length > 0 ? `### 🔴 High Priority Issues (${highlights.highPriority.length})
 ${highlights.highPriority.slice(0, 5).map(issue => 
   `- **${issue.key}**: ${issue.summary}`).join('\n')}
 ` : ''}
 
-${highlights.blocked.length > 0 ? `### ⚠️ נושאים חסומים (${highlights.blocked.length})
+${highlights.blocked.length > 0 ? `### ⚠️ Blocked Issues (${highlights.blocked.length})
 ${highlights.blocked.slice(0, 5).map(issue => 
   `- **${issue.key}**: ${issue.summary}`).join('\n')}
 ` : ''}
 
-${highlights.completed.length > 0 ? `### ✅ הושלמו לאחרונה (${highlights.completed.length})
+${highlights.completed.length > 0 ? `### ✅ Recently Completed (${highlights.completed.length})
 ${highlights.completed.slice(0, 5).map(issue => 
   `- **${issue.key}**: ${issue.summary}`).join('\n')}
 ` : ''}
 
-## נושאים לפי סוג
+## Issues by Type
 
 ${Object.entries(statistics.byType).map(([type, count]) => 
   `- **${type}:** ${count}`).join('\n')}
 
-## נושאים לפי עדיפות
+## Issues by Priority
 
 ${Object.entries(statistics.byPriority).map(([priority, count]) => 
   `- **${priority}:** ${count}`).join('\n')}
 
-## חלוקה לפי צוות
+## Team Distribution
 
-| חבר צוות | נושאים משויכים |
-|----------|-----------------|
+| Team Member | Assigned Issues |
+|-------------|-----------------|
 ${Object.entries(statistics.byAssignee)
   .sort((a, b) => b[1] - a[1])
   .map(([assignee, count]) => `| ${assignee} | ${count} |`)
   .join('\n')}
 
 ${issues.bugs.length > 0 ? `
-## 🐛 באגים (${issues.bugs.length})
+## 🐛 Bugs (${issues.bugs.length})
 
-| מזהה | תיאור | עדיפות | סטטוס | אחראי |
-|-----|-------|--------|-------|-------|
+| Key | Summary | Priority | Status | Assignee |
+|-----|---------|----------|--------|----------|
 ${issues.bugs.map(issue => 
   `| ${issue.key} | ${issue.summary} | ${issue.priority} | ${issue.status} | ${issue.assignee} |`
 ).join('\n')}` : ''}
 
 ${issues.stories.length > 0 ? `
-## 📖 סטוריז (${issues.stories.length})
+## 📖 User Stories (${issues.stories.length})
 
-| מזהה | תיאור | נקודות | סטטוס | אחראי |
-|-----|-------|---------|-------|-------|
+| Key | Summary | Story Points | Status | Assignee |
+|-----|---------|--------------|--------|----------|
 ${issues.stories.map(issue => 
   `| ${issue.key} | ${issue.summary} | ${issue.storyPoints || '-'} | ${issue.status} | ${issue.assignee} |`
 ).join('\n')}` : ''}
 
 ---
 
-*נוצר על ידי Atlassian Intelligence Platform*  
+*Generated by Atlassian Intelligence Platform*  
 *${metadata.generatedAtFormatted}*
   `.trim();
 }
@@ -782,22 +771,24 @@ ${issues.stories.map(issue =>
 function generateSummaryText(reportData) {
   const { metadata, statistics, highlights } = reportData;
   
-  return `📊 **דוח ${metadata.piName} נוצר בהצלחה**
+  return `
+📊 **${metadata.piName} Report Generated**
 
-**סיכום:**
-• סה"כ נושאים: ${metadata.totalIssues}
-• אחוז השלמה: ${metadata.completionPercentage}%
-• עדיפות גבוהה: ${highlights.highPriority.length} נושאים
-• חסומים: ${highlights.blocked.length} נושאים
+**Summary:**
+• Total Issues: ${metadata.totalIssues}
+• Completion: ${metadata.completionPercentage}%
+• High Priority: ${highlights.highPriority.length} issues
+• Blocked: ${highlights.blocked.length} issues
 
-**סוגי נושאים:**
+**Issue Types:**
 ${Object.entries(statistics.byType).map(([type, count]) => 
   `• ${type}: ${count}`).join('\n')}
 
-**פעולות זמינות:**
-• הצג דוח מלא בדפדפן
-• הורד כ-HTML/PDF
-• ייצוא ל-Confluence (בקרוב)`;
+**Quick Actions:**
+• View full report in browser
+• Download as HTML/PDF
+• Export to Confluence (coming soon)
+  `.trim();
 }
 
-// Exports already declared with function definitions above
+export { generatePIReport, generateHTMLReport, generateMarkdownReport };
