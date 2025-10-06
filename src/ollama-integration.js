@@ -54,6 +54,10 @@ Available intents:
 - NEXT_PI: User wants next Program Increment
 - CURRENT_PI: User wants current PI
 - PI_REPORT: User wants PI report or summary
+- GENERATE_PI_REPORT: User wants to generate/create a report for a PI
+- CURRENT_PI_REPORT: User wants a report for the current PI
+- NEXT_PI_REPORT: User wants a report for the next PI
+- HELP: User is asking for help or guidance
 - UNKNOWN: Cannot determine intent
 
 Examples:
@@ -66,7 +70,20 @@ Examples:
 "show next PI" -> NEXT_PI
 "next program increment" -> NEXT_PI
 "current PI" -> CURRENT_PI
-"PI report" -> PI_REPORT
+"generate PI report" -> GENERATE_PI_REPORT  
+"create report for current PI" -> CURRENT_PI_REPORT
+"create summary for next PI" -> NEXT_PI_REPORT
+"make a report for PI-26.1" -> GENERATE_PI_REPORT
+"PI report" -> GENERATE_PI_REPORT
+"current PI summary" -> CURRENT_PI_REPORT
+"next PI report" -> NEXT_PI_REPORT
+"צור דוח עבור PI נוכחי" -> CURRENT_PI_REPORT
+"צור סיכום עבור PI הבא" -> NEXT_PI_REPORT
+"help" -> HELP
+"עזרה" -> HELP
+"איך להשתמש" -> HELP
+"מה אפשר לעשות" -> HELP
+"what can you do" -> HELP
 
 Respond with ONLY the intent name.`;
 
@@ -74,14 +91,19 @@ Respond with ONLY the intent name.`;
     const response = await callOllama(query, systemPrompt);
     const intent = response.trim().toUpperCase().replace(/[^A-Z_]/g, '');
     
-    // Validate intent - ADD THE NEW INTENTS HERE
+    // Validate intent
     const validIntents = [
-      'LIST_BUGS', 'LIST_TASKS', 'LIST_STORIES', 'PROJECT_SUMMARY',
-      'HIGH_PRIORITY', 'MY_ISSUES', 'IN_PROGRESS', 'SEARCH_ISSUES',
-      'CONFLUENCE_SEARCH', 'SPRINT_INFO', 
-      'NEXT_PI', 'CURRENT_PI', 'PI_REPORT',  // ← ADD THESE
+      'LIST_BUGS', 'LIST_TASKS', 'LIST_STORIES',
+      'PROJECT_SUMMARY', 'HIGH_PRIORITY',
+      'MY_ISSUES', 'IN_PROGRESS',
+      'SEARCH_ISSUES', 'CONFLUENCE_SEARCH',
+      'SPRINT_INFO',
+      'NEXT_PI', 'CURRENT_PI', 'PI_REPORT',
+      'GENERATE_PI_REPORT', 'CURRENT_PI_REPORT', 'NEXT_PI_REPORT',
+      'HELP',
       'UNKNOWN'
-    ];    
+    ];  
+
     if (validIntents.includes(intent)) {
       return intent;
     }
@@ -148,6 +170,12 @@ function buildJQL(intent, projectKey, keywords = '') {
     NEXT_PI: `${baseProject} AND labels = "PI-26.1" ORDER BY priority DESC, created DESC`,
     CURRENT_PI: `${baseProject} AND labels = "PI-25.4" ORDER BY priority DESC, created DESC`,
     PI_REPORT: `${baseProject} AND labels IN ("PI-26.1", "PI-25.4") ORDER BY labels DESC, priority DESC`,
+    CURRENT_PI_REPORT: `${baseProject} AND labels = "PI-25.4" ORDER BY priority DESC, type DESC`,
+    NEXT_PI_REPORT: `${baseProject} AND labels = "PI-26.1" ORDER BY priority DESC, type DESC`,
+    GENERATE_PI_REPORT: keywords ? 
+      `${baseProject} AND labels = "${keywords}" ORDER BY priority DESC, type DESC` :
+      `${baseProject} AND labels in ("PI-25.4", "PI-26.1") ORDER BY priority DESC, type DESC`,
+    HELP: null,
     UNKNOWN: `${baseProject} ORDER BY created DESC`
   };
   
@@ -169,23 +197,91 @@ function buildCQL(keywords = '') {
  */
 function getExplanation(intent, keywords = '') {
   const explanations = {
-    LIST_BUGS: 'Listing all open bugs',
-    LIST_TASKS: 'Listing all open tasks',
-    LIST_STORIES: 'Listing all open stories',
-    PROJECT_SUMMARY: 'Showing project summary',
-    HIGH_PRIORITY: 'Showing high priority issues',
-    MY_ISSUES: 'Showing your assigned issues',
-    IN_PROGRESS: 'Showing in-progress issues',
-    SEARCH_ISSUES: keywords ? `Searching for: ${keywords}` : 'Showing all issues',
-    CONFLUENCE_SEARCH: keywords ? `Searching Confluence for: ${keywords}` : 'Showing Confluence pages',
-    SPRINT_INFO: 'Showing current sprint information',
-    NEXT_PI: 'Showing next Program Increment (PI-26.1)',
-    CURRENT_PI: 'Showing current Program Increment (PI-25.4)',
-    PI_REPORT: 'Showing PI report across increments',
-    UNKNOWN: 'Showing recent issues'
+    LIST_BUGS: '🐛 מציג את כל הבאגים הפתוחים',
+    LIST_TASKS: '📋 מציג את כל המשימות הפתוחות',
+    LIST_STORIES: '📖 מציג את כל הסטוריז',
+    PROJECT_SUMMARY: '📊 סיכום הפרויקט',
+    HIGH_PRIORITY: '🔴 מציג נושאים בעדיפות גבוהה',
+    MY_ISSUES: '👤 מציג את הנושאים שלך',
+    IN_PROGRESS: '🔄 מציג נושאים בעבודה',
+    SEARCH_ISSUES: keywords ? `🔍 מחפש נושאים על ${keywords}` : '🔍 מחפש נושאים',
+    CONFLUENCE_SEARCH: keywords ? `📚 מחפש דפי Confluence על ${keywords}` : '📚 מחפש דפי Confluence',
+    SPRINT_INFO: '🏃 מידע על הספרינט',
+    NEXT_PI: '📅 מציג נושאים של PI הבא (PI-26.1)',
+    CURRENT_PI: '📅 מציג נושאים של PI נוכחי (PI-25.4)',
+    PI_REPORT: '📊 דוח Program Increment',
+    CURRENT_PI_REPORT: '📊 יוצר דוח מקיף עבור PI נוכחי (PI-25.4)',
+    NEXT_PI_REPORT: '📊 יוצר דוח מקיף עבור PI הבא (PI-26.1)',
+    GENERATE_PI_REPORT: keywords ? 
+      `📊 יוצר דוח PI עבור ${keywords}` :
+      '📊 יוצר דוח Program Increment',
+    HELP: '💡 הנה מה שאני יכול לעשות עבורך',
+    UNKNOWN: keywords ? `🔍 מציג נושאים קשורים ל-${keywords}` : '📋 מציג נושאים אחרונים'
   };
   
   return explanations[intent] || explanations.UNKNOWN;
+}
+
+/**
+ * Check if intent is a report intent
+ */
+export function isReportIntent(intent) {
+  return ['GENERATE_PI_REPORT', 'CURRENT_PI_REPORT', 'NEXT_PI_REPORT'].includes(intent);
+}
+
+/**
+ * Get PI details from intent
+ */
+export function getPIDetailsFromIntent(intent, keywords) {
+  const piMappings = {
+    CURRENT_PI_REPORT: { label: 'PI-25.4', name: 'PI נוכחי' },
+    NEXT_PI_REPORT: { label: 'PI-26.1', name: 'PI הבא' },
+    GENERATE_PI_REPORT: keywords ? 
+      { label: keywords, name: `PI ${keywords}` } :
+      { label: 'PI-25.4', name: 'PI נוכחי' }  // default to current
+  };
+  
+  return piMappings[intent] || null;
+}
+
+/**
+ * Get help response
+ */
+export function getHelpResponse() {
+  return {
+    success: true,
+    message: `💡 **ברוך הבא למערכת Atlassian Intelligence!**
+
+אני יכול לעזור לך עם:
+
+**🔍 חיפושים ושאילתות:**
+• "הצג את כל הבאגים" - רשימת כל הבאגים הפתוחים
+• "נושאים בעדיפות גבוהה" - נושאים קריטיים  
+• "המשימות שלי" - נושאים משויכים אליך
+• "סיכום פרויקט" - סטטיסטיקות כלליות
+
+**📊 דוחות PI:**
+• "צור דוח עבור PI נוכחי" - דוח מלא ל-PI-25.4
+• "צור סיכום עבור PI הבא" - דוח מלא ל-PI-26.1
+• "דוח PI" - יצירת דוח Program Increment
+
+**📋 סוגי נושאים:**
+• "הצג סטוריז" - כל הסטוריז
+• "הצג משימות" - כל המשימות
+• "נושאים בעבודה" - מה בביצוע כרגע
+
+**🔎 חיפוש מתקדם:**
+• "חפש נושאים על OAuth" - חיפוש לפי מילת מפתח
+• "דפי Confluence" - חיפוש בתיעוד
+
+פשוט תכתוב מה שאתה צריך בשפה טבעית!`,
+    aiThinking: 'הנה מה שאני יכול לעשות עבורך',
+    toolUsed: 'help',
+    result: {
+      type: 'help',
+      data: null
+    }
+  };
 }
 
 /**
@@ -195,9 +291,14 @@ export async function parseQuery(query, projectKey = 'KMD') {
   try {
     console.log('🎯 Stage 1: Classifying intent...');
     
-    // Stage 1: Classify intent using Ollama
+    // Stage 1: Classify intent using Ollama - returns just a string
     const intent = await classifyIntent(query);
     console.log('📋 Classified intent:', intent);
+    
+    // Handle HELP intent specially
+    if (intent === 'HELP') {
+      return getHelpResponse();
+    }
     
     // Stage 2: Build queries using deterministic JavaScript
     let jql = '';
@@ -246,7 +347,9 @@ export async function parseQuery(query, projectKey = 'KMD') {
     return patternMatchingFallback(query, projectKey) || {
       intent: 'UNKNOWN',
       jql: `project = ${projectKey} ORDER BY created DESC`,
-      explanation: 'Showing recent issues (fallback)'
+      cql: '',
+      keywords: '',
+      explanation: 'מציג נושאים אחרונים (fallback)'
     };
   }
 }
@@ -257,11 +360,40 @@ export async function parseQuery(query, projectKey = 'KMD') {
 function patternMatchingFallback(query, projectKey) {
   const lowerQuery = query.toLowerCase();
   
+  // Help patterns
+  if (lowerQuery === 'עזרה' || lowerQuery === 'help' || lowerQuery.includes('מה אפשר') || lowerQuery.includes('what can')) {
+    return getHelpResponse();
+  }
+  
+  // Report patterns
+  if (lowerQuery.includes('דוח') || lowerQuery.includes('report')) {
+    if (lowerQuery.includes('נוכחי') || lowerQuery.includes('current')) {
+      return {
+        intent: 'CURRENT_PI_REPORT',
+        jql: buildJQL('CURRENT_PI_REPORT', projectKey),
+        cql: '',
+        keywords: '',
+        explanation: getExplanation('CURRENT_PI_REPORT')
+      };
+    }
+    if (lowerQuery.includes('הבא') || lowerQuery.includes('next')) {
+      return {
+        intent: 'NEXT_PI_REPORT',
+        jql: buildJQL('NEXT_PI_REPORT', projectKey),
+        cql: '',
+        keywords: '',
+        explanation: getExplanation('NEXT_PI_REPORT')
+      };
+    }
+  }
+  
   if (lowerQuery.includes('באג') || lowerQuery.includes('bug')) {
     return {
       intent: 'LIST_BUGS',
       jql: buildJQL('LIST_BUGS', projectKey),
-      explanation: 'Listing all open bugs (fallback)'
+      cql: '',
+      keywords: '',
+      explanation: 'מציג את כל הבאגים הפתוחים (fallback)'
     };
   }
   
@@ -269,7 +401,9 @@ function patternMatchingFallback(query, projectKey) {
     return {
       intent: 'PROJECT_SUMMARY',
       jql: buildJQL('PROJECT_SUMMARY', projectKey),
-      explanation: 'Showing project summary (fallback)'
+      cql: '',
+      keywords: '',
+      explanation: 'מציג סיכום פרויקט (fallback)'
     };
   }
   
@@ -277,15 +411,19 @@ function patternMatchingFallback(query, projectKey) {
     return {
       intent: 'HIGH_PRIORITY',
       jql: buildJQL('HIGH_PRIORITY', projectKey),
-      explanation: 'Showing high priority issues (fallback)'
+      cql: '',
+      keywords: '',
+      explanation: 'מציג נושאים בעדיפות גבוהה (fallback)'
     };
   }
   
   if (lowerQuery.includes('confluence')) {
     return {
       intent: 'CONFLUENCE_SEARCH',
+      jql: '',
       cql: buildCQL(),
-      explanation: 'Searching Confluence (fallback)'
+      keywords: '',
+      explanation: 'מחפש ב-Confluence (fallback)'
     };
   }
   

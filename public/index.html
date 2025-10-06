@@ -326,76 +326,221 @@
             letter-spacing: 0.5px;
         }
         
-        /* Report tables */
-        .query-response table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            font-size: 13px;
-        }
-        
-        .query-response table th {
-            background: #f4f5f7;
-            color: #172b4d;
-            padding: 12px;
-            text-align: right;
-            font-weight: 600;
-            border-bottom: 2px solid #dfe1e6;
-        }
-        
-        .query-response table td {
-            padding: 12px;
-            border-bottom: 1px solid #ebecf0;
-        }
-        
-        .query-response table tr:hover {
-            background-color: #fafbfc;
-        }
-        
-        /* Export buttons */
-        .export-section {
-            background: #f4f5f7;
-            padding: 16px;
+        /* Report Display Styles */
+        .report-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
             margin: 20px 0;
-            border-radius: 3px;
-            border: 1px solid #dfe1e6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        .export-title {
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: #172b4d;
-            font-size: 13px;
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #0052CC;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
         }
         
-        .export-buttons {
+        .report-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #0052CC;
+        }
+        
+        .report-actions {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
         }
         
-        .export-btn {
-            background: white;
-            border: 1px solid #dfe1e6;
+        .report-action-btn {
             padding: 8px 16px;
-            border-radius: 3px;
+            border-radius: 4px;
+            border: none;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 500;
-            color: #42526e;
-            transition: all 0.15s;
+            transition: all 0.2s;
         }
         
-        .export-btn:hover {
-            background: #0052cc;
+        .btn-view {
+            background: #0052CC;
             color: white;
-            border-color: #0052cc;
         }
         
-        .export-hint {
-            margin-top: 10px;
-            font-size: 12px;
-            color: #6b778c;
+        .btn-view:hover {
+            background: #0747A6;
+        }
+        
+        .btn-download {
+            background: #36B37E;
+            color: white;
+            position: relative;
+        }
+        
+        .btn-download:hover {
+            background: #00875A;
+        }
+        
+        .btn-confluence {
+            background: #6554C0;
+            color: white;
+        }
+        
+        .btn-confluence:hover {
+            background: #5243AA;
+        }
+        
+        .btn-confluence:disabled {
+            background: #a5adba;
+            cursor: not-allowed;
+        }
+        
+        .download-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid #DFE1E6;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 8px 0;
+            z-index: 1000;
+            display: none;
+            min-width: 150px;
+        }
+        
+        .download-menu.show {
+            display: block;
+        }
+        
+        .download-option {
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        
+        .download-option:hover {
+            background: #F4F5F7;
+        }
+        
+        .report-preview {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #DFE1E6;
+            border-radius: 4px;
+            padding: 20px;
+            background: #FAFBFC;
+            margin-top: 20px;
+        }
+        
+        .report-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-box {
+            background: #F4F5F7;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            border-right: 3px solid #0052CC;
+        }
+        
+        .stat-box .stat-label {
+            font-size: 0.9em;
+            color: #5E6C84;
+            margin-bottom: 5px;
+        }
+        
+        .stat-box .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #172B4D;
+        }
+        
+        /* Modal for full report view */
+        .report-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+        
+        .report-modal.show {
+            display: block;
+        }
+        
+        .report-modal-content {
+            background: white;
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 1200px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+        
+        .report-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 2px solid #DFE1E6;
+        }
+        
+        .report-modal-close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #5E6C84;
+        }
+        
+        .report-modal-close:hover {
+            color: #172B4D;
+        }
+        
+        .report-modal-body {
+            padding: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        /* Notification toast */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: #172B4D;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 3000;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
         
         /* Loading spinner */
@@ -454,6 +599,15 @@
                 margin: 30px 0;
                 padding: 24px;
             }
+            
+            .report-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .report-action-btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -498,7 +652,7 @@
         </div>
 
         <!-- Results area -->
-        <div class="results-area">
+        <div class="results-area" id="resultsArea">
             <div class="results-container" id="resultsContainer">
                 <!-- Welcome message -->
                 <div class="welcome-card">
@@ -512,20 +666,36 @@
         </div>
     </div>
 
+    <!-- Report Modal -->
+    <div id="reportModal" class="report-modal">
+        <div class="report-modal-content">
+            <div class="report-modal-header">
+                <h2>דוח מלא</h2>
+                <span class="report-modal-close" onclick="closeReportModal()">&times;</span>
+            </div>
+            <div class="report-modal-body" id="reportModalBody"></div>
+        </div>
+    </div>
+
     <script src="config.js"></script>
     <script>
         const resultsContainer = document.getElementById('resultsContainer');
+        const resultsArea = document.getElementById('resultsArea');
         const queryInput = document.getElementById('queryInput');
         const sendBtn = document.getElementById('sendBtn');
+        
+        // Store last generated report globally
+        let lastGeneratedReport = null;
 
-        // Your existing sophisticated suggestion system
+        // Your existing sophisticated suggestion system with report additions
         const suggestionSets = {
             initial: [
                 { text: 'עזרה', query: 'עזרה' },
                 { text: 'כל הבאגים', query: 'הצג את כל הבאגים' },
                 { text: 'עדיפות גבוהה', query: 'הצג נושאים בעדיפות גבוהה' },
                 { text: 'סיכום פרויקט', query: 'תן לי סיכום פרויקט' },
-                { text: 'דוח ספרינט', query: 'צור דוח ספרינט' },
+                { text: '📊 דוח PI נוכחי', query: 'צור דוח עבור PI נוכחי' },
+                { text: '📊 דוח PI הבא', query: 'צור סיכום עבור PI הבא' },
                 { text: 'המשימות שלי', query: 'הצג משימות משויכות לי' },
                 { text: 'ספרינטים עתידיים', query: 'הצג משימות בספרינטים עתידיים' }
             ],
@@ -540,6 +710,11 @@
                 { text: 'קריטיים בלבד', query: 'רק קריטיים' },
                 { text: 'מהשבוע', query: 'הצג באגים מהשבוע האחרון' },
                 { text: 'דוח באגים', query: 'צור דוח באגים' }
+            ],
+            afterReport: [
+                { text: '📊 דוח PI קודם', query: 'צור דוח עבור PI-25.3' },
+                { text: '📊 סיכום כללי', query: 'תן לי סיכום פרויקט' },
+                { text: 'חזרה לתפריט', query: '', action: 'reset' }
             ]
         };
 
@@ -571,8 +746,21 @@
         updateSuggestions('initial');
 
         function askQuestion(question) {
+            // Check if this is a special action
+            const selectedChip = suggestionSets[currentContext].find(chip => chip.query === question);
+            if (selectedChip && selectedChip.action === 'reset') {
+                updateSuggestions('initial');
+                return;
+            }
+            
             queryInput.value = question;
             sendQuery();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function addQueryBlock(query, response, data = null) {
@@ -586,21 +774,92 @@
             const header = document.createElement('div');
             header.className = 'query-header';
             header.innerHTML = `
-                <span class="query-text">${query}</span>
+                <span class="query-text">${escapeHtml(query)}</span>
                 <span class="query-timestamp">${new Date().toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'})}</span>
             `;
 
             const responseDiv = document.createElement('div');
             responseDiv.className = 'query-response';
-            responseDiv.innerHTML = response;
+            
+            // Format the response message to preserve line breaks and formatting
+            let formattedResponse = response;
+            if (typeof response === 'string') {
+                // Convert markdown-style bold to HTML
+                formattedResponse = response
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');  // Convert newlines to HTML breaks
+            }
+            responseDiv.innerHTML = formattedResponse;
 
-            // Handle data types
-            if (data) {
-                if (data.result && (data.result.type === 'issues' || data.result.type === 'bugs' || data.result.type === 'stories' || data.result.type === 'tasks')) {
+            // Handle different data types
+            if (data && data.result) {
+                // Check if this is a report
+                if (data.result.type === 'report') {
+                    lastGeneratedReport = data.result;
+                    
+                    const reportContainer = document.createElement('div');
+                    reportContainer.className = 'report-container';
+                    reportContainer.innerHTML = `
+                        <div class="report-header">
+                            <div class="report-title">📊 דוח ${data.result.data.metadata.piName}</div>
+                            <div class="report-actions">
+                                <button class="report-action-btn btn-view" onclick="viewFullReport()">
+                                    👁️ הצג דוח מלא
+                                </button>
+                                <div style="position: relative; display: inline-block;">
+                                    <button class="report-action-btn btn-download" onclick="toggleDownloadMenu(event)">
+                                        ⬇️ הורדה
+                                    </button>
+                                    <div id="downloadMenu" class="download-menu">
+                                        <div class="download-option" onclick="downloadReport('html')">📄 HTML</div>
+                                        <div class="download-option" onclick="downloadReport('markdown')">📝 Markdown</div>
+                                        <div class="download-option" onclick="downloadReport('json')">🔧 JSON</div>
+                                    </div>
+                                </div>
+                                <button class="report-action-btn btn-confluence" onclick="publishToConfluence()" disabled>
+                                    📚 פרסם ל-Confluence (בקרוב)
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="report-stats">
+                            <div class="stat-box">
+                                <div class="stat-label">סה"כ נושאים</div>
+                                <div class="stat-value">${data.result.data.metadata.totalIssues}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">השלמה</div>
+                                <div class="stat-value">${data.result.data.metadata.completionPercentage}%</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">בביצוע</div>
+                                <div class="stat-value">${data.result.data.timeline.inProgress.length}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">עדיפות גבוהה</div>
+                                <div class="stat-value">${data.result.data.highlights.highPriority.length}</div>
+                            </div>
+                        </div>
+                        
+                        <details>
+                            <summary style="cursor: pointer; color: #0052CC; font-weight: 500; margin-top: 20px;">
+                                📋 תצוגה מקדימה
+                            </summary>
+                            <div class="report-preview">
+                                ${generateQuickPreview(data.result.data)}
+                            </div>
+                        </details>
+                    `;
+                    responseDiv.appendChild(reportContainer);
+                    updateSuggestions('afterReport');
+                }
+                // Handle issues display
+                else if (data.result.type === 'issues' || data.result.type === 'bugs' || data.result.type === 'stories' || data.result.type === 'tasks') {
                     const grid = document.createElement('div');
                     grid.className = 'results-grid';
 
-                    data.result.data.forEach(issue => {
+                    const issues = data.result.data || data.result.issues || [];
+                    issues.forEach(issue => {
                         const card = document.createElement('div');
                         const priority = issue.fields.priority?.name || 'Medium';
                         card.className = `issue-card priority-${priority.toLowerCase()}`;
@@ -608,59 +867,165 @@
                         const assignee = issue.fields.assignee?.displayName || 'לא משויך';
                         card.innerHTML = `
                             <div class="issue-key">${issue.key}</div>
-                            <div class="issue-summary">${issue.fields.summary}</div>
+                            <div class="issue-summary">${escapeHtml(issue.fields.summary)}</div>
                             <div class="issue-meta">
-                                <span class="meta-tag">👤 ${assignee}</span>
-                                <span class="meta-tag">⚡ ${priority}</span>
-                                <span class="meta-tag">📋 ${issue.fields.issuetype.name}</span>
-                                <span class="meta-tag">📊 ${issue.fields.status.name}</span>
+                                <span class="meta-tag">👤 ${escapeHtml(assignee)}</span>
+                                <span class="meta-tag">⚡ ${escapeHtml(priority)}</span>
+                                <span class="meta-tag">📋 ${escapeHtml(issue.fields.issuetype.name)}</span>
+                                <span class="meta-tag">📊 ${escapeHtml(issue.fields.status.name)}</span>
                             </div>
                         `;
                         grid.appendChild(card);
                     });
 
                     responseDiv.appendChild(grid);
+                    
+                    // Update context based on query
+                    const lowerQuery = query.toLowerCase();
+                    if (lowerQuery.includes('באג') || lowerQuery.includes('bug')) {
+                        updateSuggestions('afterBugs');
+                    }
                 }
-
-                if (data.result && data.result.type === 'summary') {
+                // Handle summary display
+                else if (data.result.type === 'summary') {
                     const statsDiv = document.createElement('div');
                     statsDiv.className = 'stats-container';
+                    const summaryData = data.result.data || {};
                     statsDiv.innerHTML = `
                         <div class="stat-card">
-                            <div class="stat-value">${data.data.total}</div>
+                            <div class="stat-value">${summaryData.total || 0}</div>
                             <div class="stat-label">Total Issues</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value">${data.data.open}</div>
+                            <div class="stat-value">${summaryData.open || 0}</div>
                             <div class="stat-label">Open</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value">${data.data.done}</div>
+                            <div class="stat-value">${summaryData.done || 0}</div>
                             <div class="stat-label">Done</div>
                         </div>
                     `;
                     responseDiv.appendChild(statsDiv);
-                }
-
-                if (data.type === 'report' && data.exportOptions) {
-                    const exportDiv = document.createElement('div');
-                    exportDiv.className = 'export-section';
-                    exportDiv.innerHTML = `
-                        <div class="export-title">אפשרויות ייצוא</div>
-                        <div class="export-buttons">
-                            <button class="export-btn" onclick="copyHTML('${data.exportOptions.html.replace(/'/g, "\\'")}')">העתק HTML</button>
-                            <button class="export-btn" onclick="downloadHTML('${data.exportOptions.html.replace(/'/g, "\\'")}')">הורד HTML</button>
-                        </div>
-                        <div class="export-hint">ניתן להדביק ישירות ב-Confluence</div>
-                    `;
-                    responseDiv.insertBefore(exportDiv, responseDiv.firstChild);
                 }
             }
 
             block.appendChild(header);
             block.appendChild(responseDiv);
             resultsContainer.appendChild(block);
-            resultsContainer.scrollTop = resultsContainer.scrollHeight;
+            
+            // Smooth scroll to bottom
+            setTimeout(() => {
+                resultsArea.scrollTo({
+                    top: resultsArea.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 100);
+        }
+
+        // Generate quick preview of report
+        function generateQuickPreview(reportData) {
+            const { statistics, highlights, issues } = reportData;
+            
+            let preview = '<h4>התפלגות נושאים</h4><ul>';
+            Object.entries(statistics.byType).forEach(([type, count]) => {
+                preview += `<li><strong>${escapeHtml(type)}:</strong> ${count} נושאים</li>`;
+            });
+            preview += '</ul>';
+            
+            if (highlights.highPriority.length > 0) {
+                preview += '<h4>נושאים בעדיפות גבוהה</h4><ul>';
+                highlights.highPriority.slice(0, 3).forEach(issue => {
+                    preview += `<li><code>${escapeHtml(issue.key)}</code>: ${escapeHtml(issue.summary)}</li>`;
+                });
+                if (highlights.highPriority.length > 3) {
+                    preview += `<li>...ועוד ${highlights.highPriority.length - 3} נושאים</li>`;
+                }
+                preview += '</ul>';
+            }
+            
+            if (highlights.blocked.length > 0) {
+                preview += '<h4>נושאים חסומים</h4><ul>';
+                highlights.blocked.slice(0, 3).forEach(issue => {
+                    preview += `<li><code>${escapeHtml(issue.key)}</code>: ${escapeHtml(issue.summary)}</li>`;
+                });
+                if (highlights.blocked.length > 3) {
+                    preview += `<li>...ועוד ${highlights.blocked.length - 3} נושאים</li>`;
+                }
+                preview += '</ul>';
+            }
+            
+            return preview;
+        }
+
+        // View full report in modal
+        function viewFullReport() {
+            if (!lastGeneratedReport) return;
+            
+            const modal = document.getElementById('reportModal');
+            document.getElementById('reportModalBody').innerHTML = lastGeneratedReport.html;
+            modal.classList.add('show');
+        }
+
+        // Close report modal
+        function closeReportModal() {
+            const modal = document.getElementById('reportModal');
+            modal.classList.remove('show');
+        }
+
+        // Toggle download menu
+        function toggleDownloadMenu(event) {
+            event.stopPropagation();
+            const menu = document.getElementById('downloadMenu');
+            menu.classList.toggle('show');
+            
+            // Close menu when clicking elsewhere
+            document.addEventListener('click', function closeMenu() {
+                menu.classList.remove('show');
+                document.removeEventListener('click', closeMenu);
+            }, { once: true });
+        }
+
+        // Download report
+        function downloadReport(format) {
+            if (!lastGeneratedReport) return;
+            
+            const content = lastGeneratedReport.downloads[format];
+            const filename = `pi-report-${new Date().toISOString().split('T')[0]}.${format}`;
+            
+            const blob = new Blob([content], { 
+                type: format === 'html' ? 'text/html' : 
+                      format === 'json' ? 'application/json' : 
+                      'text/plain' 
+            });
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            document.getElementById('downloadMenu').classList.remove('show');
+            showNotification(`✅ הדוח הורד כ-${filename}`);
+        }
+
+        // Publish to Confluence (placeholder)
+        function publishToConfluence() {
+            showNotification('📚 פרסום ל-Confluence יהיה זמין בקרוב!');
+        }
+
+        // Show notification
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
         }
 
         async function sendQuery() {
@@ -672,7 +1037,7 @@
             sendBtn.innerHTML = '<div class="loading"></div>';
 
             try {
-                // Try AI endpoint first
+                // Try AI endpoint
                 const response = await fetch(`${window.API_URL}/api/query-with-ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -683,14 +1048,6 @@
                 
                 if (result.success) {
                     addQueryBlock(query, result.message, result);
-                    
-                    // Update suggestions based on context
-                    const lowerQuery = query.toLowerCase();
-                    if (lowerQuery.includes('באג') || lowerQuery.includes('bug')) {
-                        updateSuggestions('afterBugs');
-                    } else {
-                        updateSuggestions('initial');
-                    }
                 } else {
                     throw new Error(result.error || 'Query failed');
                 }
@@ -703,18 +1060,20 @@
             }
         }
 
-        function copyHTML(html) {
-            navigator.clipboard.writeText(html).then(() => alert('הועתק!'));
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('reportModal');
+            if (event.target == modal) {
+                modal.classList.remove('show');
+            }
         }
 
-        function downloadHTML(html) {
-            const blob = new Blob([html], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `report-${new Date().toISOString().split('T')[0]}.html`;
-            a.click();
-        }
+        // Handle Escape key for modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeReportModal();
+            }
+        });
     </script>
 </body>
 </html>

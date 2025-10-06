@@ -1,13 +1,14 @@
 // src/web-server.js
-// Optimized version with persistent MCP connection
+// Optimized version with persistent MCP connection and report generation
 
 import express from 'express';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { parseQuery, isOllamaAvailable } from './ollama-integration.js';
+import { parseQuery, isOllamaAvailable, isReportIntent, getPIDetailsFromIntent } from './ollama-integration.js';
+import { generatePIReport } from './report-generator.js';
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));  // Increased limit for report handling
 app.use(express.static('public'));
 
 const CLOUD_ID = '252a1017-b96e-41fc-8035-a3c27ec05bb5';
@@ -81,7 +82,7 @@ async function getMCPClient() {
   return mcpClient;
 }
 
-// AI-powered query endpoint
+// AI-powered query endpoint with report generation support
 app.post('/api/query-with-ai', async (req, res) => {
   const { query } = req.body;
 
@@ -104,9 +105,65 @@ app.post('/api/query-with-ai', async (req, res) => {
     const parsed = await parseQuery(query, PROJECT_KEY);
     console.log('📊 Parsed:', parsed);
 
+    // Check if this is a HELP response (parseQuery returns the full response for HELP)
+    if (parsed.toolUsed === 'help') {
+      // Return the help response directly
+      return res.json(parsed);
+    }
+    
     // Get MCP client
     const client = await getMCPClient();
 
+    // Check if this is a report generation request
+    if (isReportIntent(parsed.intent)) {
+      console.log('📊 Report generation requested');
+      
+      // Get PI details for the report
+      const piDetails = getPIDetailsFromIntent(parsed.intent, parsed.keywords);
+      
+      if (!piDetails) {
+        return res.json({
+          success: false,
+          message: '❌ Could not determine which PI to report on',
+          aiThinking: parsed.explanation,
+          toolUsed: 'report_generator'
+        });
+      }
+      
+      // Generate the report
+      const reportResult = await generatePIReport(
+        client, 
+        piDetails.label, 
+        piDetails.name, 
+        PROJECT_KEY
+      );
+      
+      if (reportResult.success) {
+        res.json({
+          success: true,
+          message: reportResult.summary,
+          aiThinking: parsed.explanation,
+          toolUsed: 'report_generator',
+          result: {
+            type: 'report',
+            data: reportResult.reportData,
+            html: reportResult.htmlReport,
+            downloads: reportResult.downloads
+          }
+        });
+      } else {
+        res.json({
+          success: false,
+          message: '❌ Failed to generate report: ' + reportResult.error,
+          aiThinking: parsed.explanation,
+          toolUsed: 'report_generator'
+        });
+      }
+      
+      return;
+    }
+
+    // Handle non-report queries (existing logic)
     let result;
     let resultType = 'issues';
 
@@ -129,7 +186,7 @@ app.post('/api/query-with-ai', async (req, res) => {
         arguments: {
           cloudId: CLOUD_ID,
           jql: parsed.jql,
-          fields: ['summary', 'status', 'issuetype', 'priority', 'assignee', 'created'],
+          fields: ['summary', 'status', 'issuetype', 'priority', 'assignee', 'created', 'labels', 'duedate', 'reporter', 'description'],
           maxResults: 50
         }
       });
@@ -178,6 +235,61 @@ app.post('/api/query-with-ai', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+// Download report endpoint
+app.post('/api/download-report', (req, res) => {
+  try {
+    const { format, content, filename } = req.body;
+    
+    if (!content || !format || !filename) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters' 
+      });
+    }
+    
+    // Set appropriate headers for download
+    const mimeTypes = {
+      html: 'text/html',
+      markdown: 'text/markdown',
+      json: 'application/json'
+    };
+    
+    res.setHeader('Content-Type', mimeTypes[format] || 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    // Send the content
+    res.send(content);
+    
+  } catch (error) {
+    console.error('❌ Error downloading report:', error);
+    res.status(500).json({ 
+      error: 'Failed to download report' 
+    });
+  }
+});
+
+// Get available PIs endpoint (for future enhancement)
+app.get('/api/available-pis', async (req, res) => {
+  try {
+    // This could be enhanced to dynamically discover PIs from Jira
+    const availablePIs = [
+      { label: 'PI-25.4', name: 'Current PI', status: 'active' },
+      { label: 'PI-26.1', name: 'Next PI', status: 'planned' },
+      { label: 'PI-25.3', name: 'Previous PI', status: 'completed' }
+    ];
+    
+    res.json({
+      success: true,
+      pis: availablePIs
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching PIs:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch available PIs' 
     });
   }
 });
