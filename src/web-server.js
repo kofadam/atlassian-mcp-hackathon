@@ -6,6 +6,14 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { parseQuery, isOllamaAvailable, isReportIntent, getPIDetailsFromIntent } from './ollama-integration.js';
 import { generatePIReport } from './report-generator.js';
+import { 
+  createConfluencePage, 
+  listConfluencePages, 
+  searchConfluence,
+  publishReportToConfluence,
+  createKnowledgeArticle,
+  createProjectStructure 
+} from './confluence-integration.js';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));  // Increased limit for report handling
@@ -161,6 +169,49 @@ app.post('/api/query-with-ai', async (req, res) => {
       }
       
       return;
+    }
+    // Handle Confluence page listing
+    if (parsed.intent === 'CONFLUENCE_LIST_PAGES') {
+      const result = await listConfluencePages(client, CLOUD_ID, 'KP', 20);
+      
+      return res.json({
+        success: true,
+        message: result.message,
+        aiThinking: parsed.explanation,
+        toolUsed: 'confluence_list',
+        result: {
+          type: 'confluence_pages',
+          data: result.pages
+        }
+      });
+    }
+    
+    // Handle Confluence page creation form
+    if (parsed.intent === 'CONFLUENCE_CREATE_PAGE') {
+      return res.json({
+        success: true,
+        message: 'פתיחת טופס יצירת דף Confluence',
+        aiThinking: parsed.explanation,
+        toolUsed: 'confluence_create_form',
+        result: {
+          type: 'confluence_form',
+          data: null
+        }
+      });
+    }
+    
+    // Handle publishing report to Confluence
+    if (parsed.intent === 'PUBLISH_REPORT_TO_CONFLUENCE') {
+      return res.json({
+        success: true,
+        message: 'בחר דוח לפרסום ב-Confluence',
+        aiThinking: parsed.explanation,
+        toolUsed: 'confluence_publish',
+        result: {
+          type: 'confluence_publish_prompt',
+          data: null
+        }
+      });
     }
 
     // Handle non-report queries (existing logic)
@@ -323,6 +374,129 @@ app.post('/api/query', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+// Create Confluence page endpoint
+app.post('/api/confluence/create-page', async (req, res) => {
+  try {
+    const { title, content, type, spaceKey = 'KP' } = req.body;
+    
+    if (!title || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'כותרת ותוכן נדרשים'
+      });
+    }
+    
+    const client = await getMCPClient();
+    
+    let result;
+    if (type === 'kb') {
+      result = await createKnowledgeArticle(client, CLOUD_ID, title, content, 'general', spaceKey);
+    } else {
+      const isLiveDoc = type === 'live';
+      result = await createConfluencePage(client, CLOUD_ID, title, content, spaceKey, isLiveDoc);
+    }
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('❌ Error creating Confluence page:', error);
+    res.status(500).json({
+      success: false,
+      message: `שגיאה ביצירת דף: ${error.message}`
+    });
+  }
+});
+
+// List Confluence pages endpoint
+app.get('/api/confluence/list-pages', async (req, res) => {
+  try {
+    const { spaceKey = 'KP', limit = 20 } = req.query;
+    
+    const client = await getMCPClient();
+    const result = await listConfluencePages(client, CLOUD_ID, spaceKey, parseInt(limit));
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('❌ Error listing Confluence pages:', error);
+    res.status(500).json({
+      success: false,
+      message: `שגיאה בקריאת דפים: ${error.message}`
+    });
+  }
+});
+
+// Search Confluence endpoint
+app.post('/api/confluence/search', async (req, res) => {
+  try {
+    const { query, spaceKey = 'KP' } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: 'חיפוש נדרש'
+      });
+    }
+    
+    const client = await getMCPClient();
+    const result = await searchConfluence(client, CLOUD_ID, query, spaceKey);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('❌ Error searching Confluence:', error);
+    res.status(500).json({
+      success: false,
+      message: `שגיאה בחיפוש: ${error.message}`
+    });
+  }
+});
+
+// Publish report to Confluence endpoint
+app.post('/api/confluence/publish-report', async (req, res) => {
+  try {
+    const { reportData, spaceKey = 'KP' } = req.body;
+    
+    if (!reportData) {
+      return res.status(400).json({
+        success: false,
+        message: 'נתוני דוח נדרשים'
+      });
+    }
+    
+    const client = await getMCPClient();
+    const result = await publishReportToConfluence(client, CLOUD_ID, reportData, spaceKey);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('❌ Error publishing report to Confluence:', error);
+    res.status(500).json({
+      success: false,
+      message: `שגיאה בפרסום דוח: ${error.message}`
+    });
+  }
+});
+
+// Create project structure endpoint
+app.post('/api/confluence/create-structure', async (req, res) => {
+  try {
+    const { projectName = 'KMD Project', spaceKey = 'KP' } = req.body;
+    
+    const client = await getMCPClient();
+    const result = await createProjectStructure(client, CLOUD_ID, projectName, spaceKey);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('❌ Error creating project structure:', error);
+    res.status(500).json({
+      success: false,
+      message: `שגיאה ביצירת מבנה: ${error.message}`
     });
   }
 });

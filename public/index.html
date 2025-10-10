@@ -574,6 +574,60 @@
             }
         }
         
+        /* Confluence pages and search styles */
+        .confluence-pages-container,
+        .confluence-search-container {
+            margin-top: 16px;
+        }
+        
+        .pages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        
+        .confluence-page-card,
+        .search-result-card {
+            background: white;
+            border: 1px solid #dfe1e6;
+            border-radius: 3px;
+            padding: 12px;
+            transition: all 0.2s;
+        }
+        
+        .confluence-page-card:hover,
+        .search-result-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        
+        .page-title,
+        .result-title {
+            font-weight: 600;
+            color: #172b4d;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .page-meta {
+            font-size: 11px;
+            color: #6b778c;
+            display: flex;
+            gap: 12px;
+        }
+        
+        .result-excerpt {
+            font-size: 13px;
+            color: #5e6c84;
+            margin-top: 8px;
+        }
+        
+        .search-results {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
         /* Mobile responsive */
         @media (max-width: 768px) {
             .header {
@@ -816,8 +870,8 @@
                                         <div class="download-option" onclick="downloadReport('json')">🔧 JSON</div>
                                     </div>
                                 </div>
-                                <button class="report-action-btn btn-confluence" onclick="publishToConfluence()" disabled>
-                                    📚 פרסם ל-Confluence (בקרוב)
+                                <button class="report-action-btn btn-confluence" onclick="publishToConfluence()">
+                                    📚 פרסם ל-Confluence
                                 </button>
                             </div>
                         </div>
@@ -852,6 +906,55 @@
                     `;
                     responseDiv.appendChild(reportContainer);
                     updateSuggestions('afterReport');
+                }
+                // Handle Confluence pages display
+                else if (data.result.type === 'confluence_pages') {
+                    const pagesContainer = document.createElement('div');
+                    pagesContainer.className = 'confluence-pages-container';
+                    
+                    const pages = data.result.data || [];
+                    if (pages.length === 0) {
+                        pagesContainer.innerHTML = '<p>לא נמצאו דפים</p>';
+                    } else {
+                        let html = '<div class="pages-grid">';
+                        pages.forEach(page => {
+                            html += `
+                                <div class="confluence-page-card">
+                                    <div class="page-title">📄 ${escapeHtml(page.title || 'ללא כותרת')}</div>
+                                    <div class="page-meta">
+                                        <span>ID: ${page.id}</span>
+                                        ${page.createdDate ? `<span>📅 ${new Date(page.createdDate).toLocaleDateString('he-IL')}</span>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        pagesContainer.innerHTML = html;
+                    }
+                    responseDiv.appendChild(pagesContainer);
+                }
+                // Handle Confluence search results
+                else if (data.result.type === 'confluence') {
+                    const searchContainer = document.createElement('div');
+                    searchContainer.className = 'confluence-search-container';
+                    
+                    const results = data.result.data || [];
+                    if (results.length === 0) {
+                        searchContainer.innerHTML = '<p>לא נמצאו תוצאות</p>';
+                    } else {
+                        let html = '<div class="search-results">';
+                        results.forEach(result => {
+                            html += `
+                                <div class="search-result-card">
+                                    <div class="result-title">📄 ${escapeHtml(result.content?.title || result.title || 'ללא כותרת')}</div>
+                                    <div class="result-excerpt">${result.excerpt || ''}</div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        searchContainer.innerHTML = html;
+                    }
+                    responseDiv.appendChild(searchContainer);
                 }
                 // Handle issues display
                 else if (data.result.type === 'issues' || data.result.type === 'bugs' || data.result.type === 'stories' || data.result.type === 'tasks') {
@@ -1012,8 +1115,34 @@
         }
 
         // Publish to Confluence (placeholder)
-        function publishToConfluence() {
-            showNotification('📚 פרסום ל-Confluence יהיה זמין בקרוב!');
+        async function publishToConfluence() {
+            if (!lastGeneratedReport) {
+                showNotification('❌ אין דוח לפרסום');
+                return;
+            }
+            
+            try {
+                showNotification('📤 מפרסם דוח ל-Confluence...');
+                
+                const response = await fetch(`${window.API_URL}/api/confluence/publish-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reportData: lastGeneratedReport.data,
+                        spaceKey: 'KP'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(`✅ ${result.message}`);
+                } else {
+                    showNotification(`❌ ${result.message}`);
+                }
+            } catch (error) {
+                showNotification(`❌ שגיאה: ${error.message}`);
+            }
         }
 
         // Show notification
